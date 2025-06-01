@@ -17,6 +17,8 @@ tracing = { version = "0.1", features = [
     "max_level_debug",
     "release_max_level_warn",
 ] }
+anyhow = "1.0.98"
+bevy-inspector-egui = "0.31.0"
 
 # Your web builds will start failing if you add a dependency that pulls in `getrandom` v0.3+.
 # To fix this, you should tell `getrandom` to use the `wasm_js` backend on Wasm.
@@ -92,10 +94,6 @@ opt-level = 1
 # Enable a large amount of optimization in the dev profile for dependencies.
 [profile.dev.package."*"]
 opt-level = 3
-
-# Remove expensive debug assertions due to <https://github.com/bevyengine/bevy/issues/14291>
-[profile.dev.package.wgpu-types]
-debug-assertions = false
 
 [profile.release]
 # Compile the entire crate as one unit.

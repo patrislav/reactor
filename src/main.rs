@@ -5,11 +5,12 @@
 
 mod asset_tracking;
 mod audio;
-mod demo;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod menus;
+mod reactorview;
 mod screens;
+mod simulation;
 mod theme;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
@@ -47,7 +48,8 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             asset_tracking::plugin,
             audio::plugin,
-            demo::plugin,
+            reactorview::plugin,
+            simulation::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             menus::plugin,

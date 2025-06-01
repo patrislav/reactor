@@ -4,10 +4,20 @@ use bevy::{
     dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
     ui::UiDebugOptions,
 };
+use bevy_inspector_egui::{
+    bevy_egui::EguiPlugin,
+    quick::{ResourceInspectorPlugin, WorldInspectorPlugin},
+};
 
-use crate::screens::Screen;
+use crate::{screens::Screen, simulation::types::SimulationConfig};
 
 pub(super) fn plugin(app: &mut App) {
+    app.add_plugins(EguiPlugin {
+        enable_multipass_for_primary_context: true,
+    });
+    app.add_plugins(WorldInspectorPlugin::default());
+    app.add_plugins(ResourceInspectorPlugin::<SimulationConfig>::default());
+
     // Log `Screen` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);
 

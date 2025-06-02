@@ -21,6 +21,7 @@ pub(super) fn plugin(app: &mut App) {
             ),
         ),
     );
+    app.add_systems(OnEnter(Screen::Gameplay), spawn_reactor_core);
     app.add_systems(OnExit(Screen::Gameplay), (close_menu, unpause));
     app.add_systems(
         OnEnter(Menu::None),

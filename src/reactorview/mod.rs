@@ -5,14 +5,21 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
     reflect::{TypeRegistration, Typed},
+    render::view::RenderLayers,
 };
 
-use crate::simulation::{events::MoveControlRod, types::*};
+use crate::{
+    screens::Screen,
+    simulation::{events::MoveControlRod, types::*},
+};
 
 mod edges;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_state::<DisplayMode>();
+
+    // TODO: should be attached to each screen (as an entity) separately
+    app.init_resource::<ReactorViewRenderLayer>();
 
     app.add_plugins(edges::plugin);
     app.add_observer(on_add_reactor_core_ready);
@@ -36,6 +43,15 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, (update_displayed_reactivity,).chain());
     app.add_systems(Update, (update_displayed_temperature,).chain());
     app.add_systems(Update, (update_displayed_control_rod,).chain());
+}
+
+#[derive(Resource, Clone, Debug, Reflect)]
+pub struct ReactorViewRenderLayer(pub RenderLayers);
+
+impl Default for ReactorViewRenderLayer {
+    fn default() -> Self {
+        Self(RenderLayers::layer(0))
+    }
 }
 
 #[derive(States, Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
@@ -90,7 +106,7 @@ impl ParameterLinks {
 #[derive(Component)]
 struct ModeMarkerText;
 
-pub const CELL_SIZE: f32 = 100.;
+pub const CELL_SIZE: f32 = 80.;
 pub const EDGE_WIDTH: f32 = 15.;
 pub const FONT_SIZE: f32 = 15.;
 pub const TEXT_PADDING: f32 = 5.;
@@ -138,6 +154,8 @@ where
 
 pub fn on_add_reactor_core_ready(
     _trigger: Trigger<OnAdd, ReactorCoreReady>,
+    screen: Res<State<Screen>>,
+    render_layer: Res<ReactorViewRenderLayer>,
     mut commands: Commands,
     mut display_mode: ResMut<NextState<DisplayMode>>,
     core: Single<&ReactorCore>,
@@ -150,6 +168,8 @@ pub fn on_add_reactor_core_ready(
             Name::new("Grid"),
             Visibility::default(),
             Transform::from_xyz(0., 0., 0.),
+            StateScoped(*screen.get()),
+            render_layer.0.clone(),
         ))
         .id();
 
@@ -170,6 +190,7 @@ pub fn on_add_reactor_core_ready(
                 Mesh2d(mesh.clone()),
                 MeshMaterial2d(materials.add(Color::from(css::GRAY))),
                 Pickable::default(),
+                render_layer.0.clone(),
             ))
             .observe(on_cell_click)
             .id();
@@ -185,6 +206,7 @@ pub fn on_add_reactor_core_ready(
                     ..default()
                 },
                 TextColor(css::BLACK.into()),
+                render_layer.0.clone(),
             ))
             .id();
         let react_text = commands
@@ -197,6 +219,7 @@ pub fn on_add_reactor_core_ready(
                     ..default()
                 },
                 TextColor(css::BLACK.into()),
+                render_layer.0.clone(),
             ))
             .id();
         let temp_text = commands
@@ -209,6 +232,7 @@ pub fn on_add_reactor_core_ready(
                     ..default()
                 },
                 TextColor(css::BLACK.into()),
+                render_layer.0.clone(),
             ))
             .id();
         commands.entity(cell).insert(
@@ -219,7 +243,7 @@ pub fn on_add_reactor_core_ready(
         );
     }
 
-    display_mode.set(DisplayMode::Control);
+    display_mode.set(DisplayMode::Temperature);
     commands.entity(grid_entity).insert(grid);
     Ok(())
 }

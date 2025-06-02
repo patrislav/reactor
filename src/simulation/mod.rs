@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use types::ReactorCore;
 
+use crate::screens::Screen;
+
 mod computation;
 pub mod events;
 pub mod schedule;
@@ -13,7 +15,7 @@ pub(super) fn plugin(app: &mut App) {
         .add_plugins(computation::plugin);
 }
 
-pub fn spawn_reactor_core(mut commands: Commands) {
+pub fn spawn_reactor_core(mut commands: Commands, screen: Res<State<Screen>>) {
     info!("Spawned reactor core");
     commands.spawn((
         Name::new("Reactor Core"),
@@ -22,5 +24,6 @@ pub fn spawn_reactor_core(mut commands: Commands) {
             rows: 7,
             ..default()
         },
+        StateScoped(*screen.get()),
     ));
 }

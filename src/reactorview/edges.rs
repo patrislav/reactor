@@ -7,9 +7,9 @@ use bevy::{
     sprite::Material2d,
 };
 
-use crate::simulation::types::*;
+use crate::{screens::Screen, simulation::types::*};
 
-use super::{CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink};
+use super::{CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink, ReactorViewRenderLayer};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, sync_reactor_edges_with_display);
@@ -28,6 +28,8 @@ struct ReactorEdgeDisplayLink(Entity);
 
 fn sync_reactor_edges_with_display(
     mut commands: Commands,
+    screen: Res<State<Screen>>,
+    render_layer: Res<ReactorViewRenderLayer>,
     edges: Query<(Entity, &ReactorEdge, &Name), Without<ReactorEdgeDisplayLink>>,
     core: Single<&ReactorCore>,
     grid: Single<&Grid>,
@@ -72,6 +74,8 @@ fn sync_reactor_edges_with_display(
                 Mesh2d(mesh),
                 MeshMaterial2d(material),
                 Transform::from_xyz(midpoint.x, midpoint.y, 2.0),
+                render_layer.0.clone(),
+                StateScoped(*screen.get()),
             ))
             .id();
         commands

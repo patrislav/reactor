@@ -1,5 +1,7 @@
 //! Spawn the main level.
 
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 
 use crate::{asset_tracking::LoadResource, audio::music, screens::Screen};
@@ -53,7 +55,7 @@ pub fn spawn_level(mut commands: Commands, level_assets: Res<LevelAssets>) {
                 children![(
                     Name::new("Camera"),
                     PlayerCamera,
-                    Transform::from_xyz(0.0, 1.0, 0.0).looking_to(Dir3::Z, Dir3::Y),
+                    Transform::from_xyz(0.0, 1.0, 0.0).looking_to(-Dir3::Z, Dir3::Y),
                     Camera3d::default(),
                     Camera {
                         hdr: true,

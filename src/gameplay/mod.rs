@@ -4,6 +4,7 @@ mod crosshair;
 mod interaction;
 mod level;
 mod player;
+mod reactor_screens;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins((
@@ -11,5 +12,6 @@ pub(super) fn plugin(app: &mut App) {
         player::plugin,
         crosshair::plugin,
         interaction::plugin,
+        reactor_screens::plugin,
     ));
 }

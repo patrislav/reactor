@@ -1,0 +1,74 @@
+use std::f32::consts::PI;
+
+use bevy::{
+    asset::RenderAssetUsages,
+    prelude::*,
+    render::{
+        render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
+        view::RenderLayers,
+    },
+};
+
+use crate::{reactorview::ReactorViewRenderLayer, screens::Screen};
+
+pub(super) fn plugin(app: &mut App) {
+    app.add_systems(OnEnter(Screen::Gameplay), spawn_screen);
+}
+
+fn spawn_screen(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let size = Extent3d {
+        width: 1024,
+        height: 768,
+        ..default()
+    };
+
+    // This is the texture that will be rendered to.
+    let mut image = Image::new_fill(
+        size,
+        TextureDimension::D2,
+        &[0, 0, 0, 0],
+        TextureFormat::Bgra8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    // You need to set these texture usage flags in order to use the image as a render target
+    image.texture_descriptor.usage =
+        TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT;
+
+    let image_handle = images.add(image);
+    let render_layers = RenderLayers::layer(1);
+
+    commands.spawn((
+        Name::new("Screen Camera"),
+        Camera2d,
+        Camera {
+            target: image_handle.clone().into(),
+            clear_color: Color::BLACK.into(),
+            ..default()
+        },
+        Transform::from_translation(Vec3::new(0.0, 0.0, 15.0)).looking_at(Vec3::ZERO, Vec3::Y),
+        render_layers.clone(),
+        StateScoped(Screen::Gameplay),
+    ));
+    commands.insert_resource(ReactorViewRenderLayer(render_layers.clone()));
+
+    let mesh = meshes.add(Plane3d::default().mesh().size(7.0, 5.0));
+    let material = materials.add(StandardMaterial {
+        base_color_texture: Some(image_handle),
+        reflectance: 0.1,
+        ..default()
+    });
+
+    let mut transform = Transform::from_xyz(0.0, 4.5, -7.5);
+    transform.rotate_x(0.5 * PI);
+    commands.spawn((
+        Name::new("Screen"),
+        Mesh3d(mesh),
+        MeshMaterial3d(material),
+        transform,
+    ));
+}

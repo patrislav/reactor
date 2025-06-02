@@ -1,5 +1,6 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
+use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::{
     dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
     ui::UiDebugOptions,
@@ -15,8 +16,13 @@ pub(super) fn plugin(app: &mut App) {
     app.add_plugins(EguiPlugin {
         enable_multipass_for_primary_context: true,
     });
-    app.add_plugins(WorldInspectorPlugin::default());
-    app.add_plugins(ResourceInspectorPlugin::<SimulationConfig>::default());
+
+    #[cfg(feature = "debug")]
+    app.add_plugins((
+        WorldInspectorPlugin::default(),
+        ResourceInspectorPlugin::<SimulationConfig>::default(),
+        PhysicsDebugPlugin::default(),
+    ));
 
     // Log `Screen` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);

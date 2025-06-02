@@ -2,6 +2,7 @@
 
 mod gameplay;
 mod loading;
+mod simulation_testing;
 mod splash;
 mod title;
 
@@ -15,6 +16,7 @@ pub(super) fn plugin(app: &mut App) {
         loading::plugin,
         splash::plugin,
         title::plugin,
+        simulation_testing::plugin,
     ));
 }
 
@@ -27,4 +29,5 @@ pub enum Screen {
     Title,
     Loading,
     Gameplay,
+    SimulationTesting,
 }

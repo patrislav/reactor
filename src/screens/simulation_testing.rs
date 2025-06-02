@@ -5,26 +5,28 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*, ui::Val::*}
 use crate::{Pause, menus::Menu, screens::Screen, simulation::spawn_reactor_core};
 
 pub(super) fn plugin(app: &mut App) {
+    app.add_systems(OnEnter(Screen::SimulationTesting), spawn_reactor_core);
+
     // Toggle pause on key press.
     app.add_systems(
         Update,
         (
             (pause, spawn_pause_overlay, open_pause_menu).run_if(
-                in_state(Screen::Gameplay)
+                in_state(Screen::SimulationTesting)
                     .and(in_state(Menu::None))
                     .and(input_just_pressed(KeyCode::KeyP).or(input_just_pressed(KeyCode::Escape))),
             ),
             close_menu.run_if(
-                in_state(Screen::Gameplay)
+                in_state(Screen::SimulationTesting)
                     .and(not(in_state(Menu::None)))
                     .and(input_just_pressed(KeyCode::KeyP)),
             ),
         ),
     );
-    app.add_systems(OnExit(Screen::Gameplay), (close_menu, unpause));
+    app.add_systems(OnExit(Screen::SimulationTesting), (close_menu, unpause));
     app.add_systems(
         OnEnter(Menu::None),
-        unpause.run_if(in_state(Screen::Gameplay)),
+        unpause.run_if(in_state(Screen::SimulationTesting)),
     );
 }
 

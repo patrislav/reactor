@@ -43,6 +43,7 @@ impl Plugin for AppPlugin {
                     ..default()
                 }),
         );
+        app.add_plugins(MeshPickingPlugin);
 
         // Add other plugins.
         app.add_plugins((

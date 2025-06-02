@@ -14,6 +14,7 @@ mod simulation;
 mod theme;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
+use bevy_skein::SkeinPlugin;
 
 fn main() -> AppExit {
     App::new().add_plugins(AppPlugin).run()
@@ -24,7 +25,7 @@ pub struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut App) {
         // Add Bevy plugins.
-        app.add_plugins(
+        app.add_plugins((
             DefaultPlugins
                 .set(AssetPlugin {
                     // Wasm builds will check for meta files (that don't exist) if this isn't set.
@@ -42,7 +43,8 @@ impl Plugin for AppPlugin {
                     .into(),
                     ..default()
                 }),
-        );
+            SkeinPlugin::default()
+        ));
 
         // Add other plugins.
         app.add_plugins((

@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 mod crosshair;
+mod crt;
 mod interaction;
 mod level;
 mod player;
@@ -13,5 +14,6 @@ pub(super) fn plugin(app: &mut App) {
         crosshair::plugin,
         interaction::plugin,
         reactor_screens::plugin,
+        crt::plugin,
     ));
 }

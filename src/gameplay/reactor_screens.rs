@@ -11,6 +11,8 @@ use bevy::{
 
 use crate::{reactorview::ReactorViewRenderLayer, screens::Screen};
 
+use super::crt::{CrtExtension, CrtMaterial};
+
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Screen::Gameplay), spawn_screen);
 }
@@ -19,7 +21,7 @@ fn spawn_screen(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<CrtMaterial>>,
 ) {
     let size = Extent3d {
         width: 1024,
@@ -57,10 +59,16 @@ fn spawn_screen(
     commands.insert_resource(ReactorViewRenderLayer(render_layers.clone()));
 
     let mesh = meshes.add(Plane3d::default().mesh().size(7.0, 5.0));
-    let material = materials.add(StandardMaterial {
-        base_color_texture: Some(image_handle),
-        reflectance: 0.1,
-        ..default()
+    let material = materials.add(CrtMaterial {
+        base: StandardMaterial {
+            base_color_texture: Some(image_handle),
+            reflectance: 0.1,
+            ..default()
+        },
+        extension: CrtExtension {
+            noise_amount: 0.5,
+            vignette_amount: 0.75,
+        },
     });
 
     let mut transform = Transform::from_xyz(0.0, 4.5, -7.5);

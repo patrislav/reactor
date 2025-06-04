@@ -42,7 +42,6 @@ fn spawn_screen(
         TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT;
 
     let image_handle = images.add(image);
-    let render_layers = RenderLayers::layer(1);
 
     commands.spawn((
         Name::new("Screen Camera"),
@@ -53,25 +52,25 @@ fn spawn_screen(
             ..default()
         },
         Transform::from_translation(Vec3::new(0.0, 0.0, 15.0)).looking_at(Vec3::ZERO, Vec3::Y),
-        render_layers.clone(),
+        RenderLayers::layer(1),
         StateScoped(Screen::Gameplay),
     ));
-    commands.insert_resource(ReactorViewRenderLayer(render_layers.clone()));
 
-    let mesh = meshes.add(Plane3d::default().mesh().size(7.0, 5.0));
+    let mesh = meshes.add(Plane3d::default().mesh().size(5.12, 3.84));
     let material = materials.add(CrtMaterial {
         base: StandardMaterial {
-            base_color_texture: Some(image_handle),
             reflectance: 0.1,
             ..default()
         },
         extension: CrtExtension {
-            noise_amount: 0.5,
+            image: image_handle,
+            noise_amount: 0.2,
             vignette_amount: 0.75,
+            aberration_amount: 0.01,
         },
     });
 
-    let mut transform = Transform::from_xyz(0.0, 4.5, -7.5);
+    let mut transform = Transform::from_xyz(0.0, 3.7, -7.5);
     transform.rotate_x(0.5 * PI);
     commands.spawn((
         Name::new("Screen"),

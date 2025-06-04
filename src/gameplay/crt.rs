@@ -14,14 +14,16 @@ pub type CrtMaterial = ExtendedMaterial<StandardMaterial, CrtExtension>;
 pub struct CrtExtension {
     // We need to ensure that the bindings of the base material and the extension do not conflict,
     // so we start from binding slot 100, leaving slots 0-99 for the base material.
-    #[uniform(100)]
-    pub noise_amount: f32,
-    #[uniform(101)]
-    pub vignette_amount: f32,
+    #[texture(100)]
+    #[sampler(101)]
+    pub image: Handle<Image>,
 
-    // WebGL2 structs must be 16 byte aligned.
-    #[cfg(feature = "webgl2")]
-    _webgl2_padding: Vec2,
+    #[uniform(102)]
+    pub noise_amount: f32,
+    #[uniform(103)]
+    pub vignette_amount: f32,
+    #[uniform(104)]
+    pub aberration_amount: f32,
 }
 
 const SHADER_ASSET_PATH: &str = "shaders/crt.wgsl";

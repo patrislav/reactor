@@ -3,6 +3,7 @@
 
 #import bevy_pbr::{
     mesh_view_bindings::globals,
+    mesh_view_bindings::view,
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::alpha_discard,
 }
@@ -28,24 +29,29 @@ struct MyExtendedMaterial {
 #endif
 }
 
-@group(2) @binding(100)
-var<uniform> noise_amount: f32;
-@group(2) @binding(101)
-var<uniform> vignette_amount: f32;
+
+@group(2) @binding(100) var image: texture_2d<f32>;
+@group(2) @binding(101) var image_sampler: sampler;
+@group(2) @binding(102) var<uniform> noise_amount: f32;
+@group(2) @binding(103) var<uniform> vignette_amount: f32;
+@group(2) @binding(104) var<uniform> aberration_amount: f32;
 
 @fragment
 fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-    // TODO: sample the texture ourselves, with aberration - update in to only
-    // pass base color (not texture)
-
     // generate a PbrInput struct from the StandardMaterial bindings
     var pbr_input = pbr_input_from_standard_material(in, is_front);
 
-    // we can optionally modify the input before lighting and alpha_discard is applied
-    let aberration = pbr_input.material.base_color.rgb;
+
+    let aber_dis: vec2<f32> = (in.uv - vec2<f32>(0.5)) * aberration_amount * length(in.uv - 0.5);
+    let aberration = vec3<f32>(
+        textureSampleBias(image, image_sampler, in.uv, view.mip_bias).r,
+        textureSampleBias(image, image_sampler, in.uv - aber_dis, view.mip_bias).g,
+        textureSampleBias(image, image_sampler, in.uv - 2.0 * aber_dis, view.mip_bias).b
+    );
+
 
     let resolution = vec2<f32>(1024.0, 768.0);
     let screen_ratio_y = resolution.y / resolution.x;

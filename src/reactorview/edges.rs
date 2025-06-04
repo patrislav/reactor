@@ -3,15 +3,25 @@ use std::f32::consts::PI;
 use bevy::{
     color::palettes::css::{self, GRAY},
     prelude::*,
-    render::render_resource::{AsBindGroup, ShaderRef},
-    sprite::Material2d,
+    render::{
+        mesh::MeshVertexBufferLayoutRef,
+        render_resource::{
+            AsBindGroup, RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+        },
+        view::RenderLayers,
+    },
+    sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 
 use crate::{screens::Screen, simulation::types::*};
 
-use super::{CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink, ReactorViewRenderLayer};
+use super::{
+    CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink, ReactorViewAssets,
+    ReactorViewRenderLayer,
+};
 
 pub(super) fn plugin(app: &mut App) {
+    app.add_plugins(Material2dPlugin::<EdgeMaterial>::default());
     app.add_systems(Update, sync_reactor_edges_with_display);
     app.add_systems(Update, sync_display_edge_positions);
     app.add_systems(Update, sync_display_edge_visibility);
@@ -28,15 +38,16 @@ struct ReactorEdgeDisplayLink(Entity);
 
 fn sync_reactor_edges_with_display(
     mut commands: Commands,
-    screen: Res<State<Screen>>,
-    render_layer: Res<ReactorViewRenderLayer>,
+    assets: Res<ReactorViewAssets>,
     edges: Query<(Entity, &ReactorEdge, &Name), Without<ReactorEdgeDisplayLink>>,
     core: Single<&ReactorCore>,
-    grid: Single<&Grid>,
+    grid: Single<(Entity, &Grid, &RenderLayers)>,
     display_cells: Query<&GlobalTransform, With<ReactorCellLink>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
+    mut materials: ResMut<Assets<EdgeMaterial>>,
 ) -> Result {
+    let (grid_entity, grid, render_layers) = grid.into_inner();
     for (edge_entity, edge, edge_name) in &edges {
         let first_cell = core
             .cells
@@ -60,13 +71,17 @@ fn sync_reactor_edges_with_display(
         let second_transform = display_cells.get(second_display_cell)?;
 
         let mesh = meshes.add(Rectangle::new(EDGE_WIDTH, CELL_SIZE));
-        let material = materials.add(Color::from(css::GRAY));
+        //let material = materials.add(Color::from(css::GRAY));
+        let material = materials.add(EdgeMaterial {
+            texture: assets.arrow_texture.clone(),
+        });
 
         let midpoint =
             (first_transform.translation().xy() + second_transform.translation().xy()) * 0.5;
         let display_entity = commands
             .spawn((
                 Name::new(format!("Display for {}", edge_name)),
+                ChildOf(grid_entity),
                 DisplayReactorEdge {
                     sim_edge: edge_entity,
                     nodes: (first_display_cell, second_display_cell),
@@ -74,10 +89,10 @@ fn sync_reactor_edges_with_display(
                 Mesh2d(mesh),
                 MeshMaterial2d(material),
                 Transform::from_xyz(midpoint.x, midpoint.y, 2.0),
-                render_layer.0.clone(),
-                StateScoped(*screen.get()),
+                render_layers.clone(),
             ))
             .id();
+        debug!("Spawned view edge: {:?}", display_entity);
         commands
             .entity(edge_entity)
             .insert(ReactorEdgeDisplayLink(display_entity));
@@ -124,7 +139,11 @@ fn sync_display_edge_visibility(
 }
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct EdgeMaterial {}
+struct EdgeMaterial {
+    #[texture(100)]
+    #[sampler(101)]
+    pub texture: Handle<Image>,
+}
 
 impl Material2d for EdgeMaterial {
     fn fragment_shader() -> ShaderRef {
@@ -133,5 +152,18 @@ impl Material2d for EdgeMaterial {
 
     fn vertex_shader() -> ShaderRef {
         "shaders/edge.wgsl".into()
+    }
+
+    fn specialize(
+        descriptor: &mut RenderPipelineDescriptor,
+        layout: &MeshVertexBufferLayoutRef,
+        _key: Material2dKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        let vertex_layout = layout.0.get_layout(&[
+            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
+            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
+        ])?;
+        descriptor.vertex.buffers = vec![vertex_layout];
+        Ok(())
     }
 }

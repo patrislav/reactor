@@ -9,6 +9,7 @@ use bevy::{
 };
 
 use crate::{
+    asset_tracking::LoadResource,
     screens::Screen,
     simulation::{events::MoveControlRod, types::*},
 };
@@ -18,6 +19,8 @@ mod view;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_state::<DisplayMode>();
+    app.init_resource::<ReactorViewAssets>();
+    app.load_resource::<ReactorViewAssets>();
 
     // TODO: should be attached to each screen (as an entity) separately
     app.init_resource::<ReactorViewRenderLayer>();
@@ -44,6 +47,22 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Update, (update_displayed_reactivity,).chain());
     app.add_systems(Update, (update_displayed_temperature,).chain());
     app.add_systems(Update, (update_displayed_control_rod,).chain());
+}
+
+#[derive(Resource, Asset, Clone, Reflect)]
+#[reflect(Resource)]
+pub struct ReactorViewAssets {
+    #[dependency]
+    pub arrow_texture: Handle<Image>,
+}
+
+impl FromWorld for ReactorViewAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.resource::<AssetServer>();
+        Self {
+            arrow_texture: assets.load("textures/arrow.png"),
+        }
+    }
 }
 
 #[derive(Resource, Clone, Debug, Reflect)]

@@ -3,11 +3,11 @@
 // Disable console on Windows for non-dev builds.
 #![cfg_attr(not(feature = "dev"), windows_subsystem = "windows")]
 
-mod asset_tracking;
+pub mod asset_tracking;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
-mod gameplay;
+pub mod gameplay;
 mod menus;
 mod reactorview;
 mod screens;

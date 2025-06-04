@@ -2,13 +2,13 @@ use bevy::prelude::*;
 
 use crate::{asset_tracking::LoadResource, screens::Screen};
 
-use super::player::Player;
+use super::{interaction::InteractionCandidate, player::Player};
 
 pub(super) fn plugin(app: &mut App) {
     app.register_type::<CrosshairAssets>();
     app.load_resource::<CrosshairAssets>();
     app.add_systems(OnEnter(Screen::Gameplay), spawn_crosshair);
-    //app.add_systems(Update, update_crosshair);
+    app.add_systems(Update, update_crosshair.run_if(in_state(Screen::Gameplay)));
 }
 
 #[derive(Resource, Asset, Clone, Reflect)]
@@ -57,7 +57,6 @@ fn spawn_crosshair(mut commands: Commands, assets: Res<CrosshairAssets>) {
         });
 }
 
-/*
 fn update_crosshair(
     assets: Res<CrosshairAssets>,
     candidate: Single<&InteractionCandidate, With<Player>>,
@@ -68,4 +67,3 @@ fn update_crosshair(
         Some(_) => assets.square.clone(),
     }
 }
-*/

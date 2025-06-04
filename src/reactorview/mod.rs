@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod edges;
+mod view;
 
 pub(super) fn plugin(app: &mut App) {
     app.init_state::<DisplayMode>();
@@ -29,7 +30,7 @@ pub(super) fn plugin(app: &mut App) {
         OnEnter(DisplayMode::Temperature),
         prepare_temperature_layout,
     );
-    app.add_systems(Update, switch_display_mode);
+    app.add_observer(switch_display_mode);
 
     app.add_systems(
         Update,
@@ -162,13 +163,17 @@ pub fn on_add_reactor_core_ready(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) -> Result {
+    info!("on_add_reactor_core_ready");
     let mut grid = Grid::default();
     let grid_entity = commands
         .spawn((
             Name::new("Grid"),
             Visibility::default(),
             Transform::from_xyz(0., 0., 0.),
-            StateScoped(*screen.get()),
+            StateScoped(match *screen.get() {
+                Screen::SimulationTesting => Screen::SimulationTesting,
+                _ => Screen::Gameplay,
+            }),
             render_layer.0.clone(),
         ))
         .id();
@@ -194,6 +199,7 @@ pub fn on_add_reactor_core_ready(
             ))
             .observe(on_cell_click)
             .id();
+        info!("Spawned a display cell: {}", cell);
         grid.simulation_to_display_cells.insert(entity, cell);
 
         let rod_text = commands
@@ -330,15 +336,16 @@ fn on_cell_click(
     Ok(())
 }
 
+#[derive(Event, Copy, Clone, Default, Reflect)]
+pub struct CycleDisplayMode(pub usize);
+
 fn switch_display_mode(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
+    _trigger: Trigger<CycleDisplayMode>,
     current_mode: Res<State<DisplayMode>>,
     mut next_mode: ResMut<NextState<DisplayMode>>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::Space) {
-        next_mode.set(match current_mode.get() {
-            DisplayMode::Control => DisplayMode::Temperature,
-            _ => DisplayMode::Control,
-        });
-    }
+    next_mode.set(match current_mode.get() {
+        DisplayMode::Control => DisplayMode::Temperature,
+        _ => DisplayMode::Control,
+    });
 }

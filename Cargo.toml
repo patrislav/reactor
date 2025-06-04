@@ -58,7 +58,7 @@ dev_native = [
     # Enable Bevy Remote Protocol
     "bevy/bevy_remote",
 ]
-debug = ["dev_native"]
+debug = []
 
 
 [package.metadata.bevy_cli.release]

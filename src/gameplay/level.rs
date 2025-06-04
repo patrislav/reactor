@@ -1,7 +1,6 @@
 //! Spawn the main level.
 
-use std::f32::consts::PI;
-
+use avian3d::prelude::{Collider, ColliderConstructor};
 use bevy::prelude::*;
 
 use crate::{asset_tracking::LoadResource, audio::music, screens::Screen};
@@ -12,7 +11,12 @@ pub(super) fn plugin(app: &mut App) {
     app.register_type::<LevelAssets>();
     app.load_resource::<LevelAssets>();
 
-    app.add_systems(OnEnter(Screen::Gameplay), spawn_level);
+    app.add_systems(OnEnter(Screen::GameplayLoading), spawn_level);
+    app.add_systems(OnEnter(Screen::Gameplay), spawn_player);
+    app.add_systems(
+        Update,
+        move_to_gameplay_once_loaded.run_if(in_state(Screen::GameplayLoading)),
+    );
 }
 
 #[derive(Resource, Asset, Clone, Reflect)]
@@ -35,10 +39,15 @@ impl FromWorld for LevelAssets {
     }
 }
 
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+struct Level;
+
 /// A system that spawns the main level.
-pub fn spawn_level(mut commands: Commands, level_assets: Res<LevelAssets>) {
+fn spawn_level(mut commands: Commands, level_assets: Res<LevelAssets>) {
     commands.spawn((
         Name::new("Level"),
+        Level,
         Transform::default(),
         Visibility::default(),
         StateScoped(Screen::Gameplay),
@@ -48,29 +57,42 @@ pub fn spawn_level(mut commands: Commands, level_assets: Res<LevelAssets>) {
                 SceneRoot(level_assets.scene.clone()),
             ),
             (
-                Name::new("Player"),
-                Transform::from_xyz(0.0, 1.5, 0.0),
-                Visibility::default(),
-                Player,
-                children![(
-                    Name::new("Camera"),
-                    PlayerCamera,
-                    Transform::from_xyz(0.0, 1.0, 0.0).looking_to(-Dir3::Z, Dir3::Y),
-                    Camera3d::default(),
-                    Camera {
-                        hdr: true,
-                        ..default()
-                    },
-                    AmbientLight {
-                        brightness: 1000.,
-                        ..default()
-                    }
-                )]
-            ),
-            (
                 Name::new("Gameplay Music"),
                 music(level_assets.music.clone())
             ),
         ],
     ));
+}
+
+fn spawn_player(mut commands: Commands, level: Single<Entity, With<Level>>) {
+    commands.spawn((
+        Name::new("Player"),
+        ChildOf(level.into_inner()),
+        Transform::from_xyz(0.0, 1.5, 0.0),
+        Visibility::default(),
+        Player,
+        children![(
+            Name::new("Camera"),
+            PlayerCamera,
+            Transform::from_xyz(0.0, 1.0, 0.0).looking_to(-Dir3::Z, Dir3::Y),
+            Camera3d::default(),
+            Camera {
+                hdr: true,
+                ..default()
+            },
+            AmbientLight {
+                brightness: 1000.,
+                ..default()
+            }
+        )],
+    ));
+}
+
+fn move_to_gameplay_once_loaded(
+    mut screen: ResMut<NextState<Screen>>,
+    collider_constructors: Query<(), With<ColliderConstructor>>,
+) {
+    if collider_constructors.iter().len() == 0 {
+        screen.set(Screen::Gameplay);
+    }
 }

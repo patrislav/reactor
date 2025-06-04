@@ -6,6 +6,8 @@ use bevy_tnua_avian3d::{TnuaAvian3dPlugin, TnuaAvian3dSensorShape};
 
 use crate::{menus::Menu, screens::Screen};
 
+use super::interaction::{self, Interact, InteractionCandidate};
+
 const CAPSULE_RADIUS: f32 = 0.5;
 const CAPSULE_LENGTH: f32 = 1.0;
 const PLAYER_HEIGHT: f32 = CAPSULE_LENGTH + 2.0 * CAPSULE_RADIUS;
@@ -18,8 +20,12 @@ pub(crate) fn plugin(app: &mut App) {
         .add_plugins(TnuaAvian3dPlugin::new(FixedUpdate))
         .add_input_context::<FirstPerson>()
         .add_systems(
-            OnEnter(Menu::None),
-            (capture_cursor, insert_player_actions).run_if(in_state(Screen::Gameplay)),
+            Update,
+            (capture_cursor, insert_player_actions).run_if(
+                in_state(Screen::Gameplay)
+                    .and(in_state(Menu::None))
+                    .and(no_player_actions),
+            ),
         )
         .add_systems(
             OnExit(Menu::None),
@@ -31,6 +37,7 @@ pub(crate) fn plugin(app: &mut App) {
             apply_movement.in_set(TnuaUserControlsSystemSet),
         )
         .add_observer(setup_player)
+        .add_observer(setup_camera)
         .add_observer(action_binding)
         .add_observer(handle_rotation)
         .add_observer(handle_horizontal_movement);
@@ -38,7 +45,7 @@ pub(crate) fn plugin(app: &mut App) {
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
 #[reflect(Component, Default)]
-#[require(Walking)]
+#[require(Walking, InteractionCandidate)]
 pub struct Player;
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
@@ -77,17 +84,18 @@ fn setup_player(trigger: Trigger<OnAdd, Player>, mut commands: Commands) {
     ));
 }
 
-/*
+fn no_player_actions(query: Query<&Actions<FirstPerson>>) -> bool {
+    query.iter().len() == 0
+}
+
 fn setup_camera(trigger: Trigger<OnAdd, PlayerCamera>, mut commands: Commands) {
-    let query_filter = SpatialQueryFilter::from_mask(GameLayer::Interactable);
+    //let query_filter = SpatialQueryFilter::from_mask(GameLayer::Interactable);
     commands.entity(trigger.target()).insert(
         RayCaster::default()
             .with_max_hits(1)
-            .with_max_distance(15.0)
-            .with_query_filter(query_filter),
+            .with_max_distance(15.0), //.with_query_filter(query_filter),
     );
 }
-*/
 
 // To define bindings for actions, write an observer for `Binding`.
 // It's also possible to create bindings before the insertion,
@@ -113,6 +121,10 @@ fn action_binding(
             DeltaScale,
             Scale::splat(100.0),
         ));
+
+    actions
+        .bind::<Interact>()
+        .to((MouseButton::Left, GamepadButton::South));
 
     actions.bind::<Rotate>().to((
         // You can attach modifiers to individual inputs as well.

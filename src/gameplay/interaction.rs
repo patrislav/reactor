@@ -1,18 +1,24 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
+use bevy_enhanced_input::{events::Completed, prelude::InputAction};
+
+use crate::reactorview;
 
 use super::{
+    GameLayer,
     //physics::GameLayer,
     player::{Player, PlayerCamera},
 };
 
 pub fn plugin(app: &mut App) {
     app.register_type::<Interactable>()
+        .register_type::<InteractableEventSource>()
         .register_type::<InteractableAnimationTarget>()
         .add_systems(Update, update_interactable_animation_targets)
         .add_systems(Update, update_interaction_candidate)
         .add_observer(on_add_interactable_animation_target)
-        .add_observer(on_add_interactable);
+        .add_observer(on_add_interactable)
+        .add_observer(handle_interaction);
 }
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
@@ -32,12 +38,40 @@ impl Default for Interactable {
     }
 }
 
-fn on_add_interactable(trigger: Trigger<OnAdd, Interactable>, mut commands: Commands) {
-    commands.entity(trigger.target()).insert((
-        RigidBody::Static,
-        //CollisionLayers::new(GameLayer::Interactable, LayerMask(0)),
-        Sensor,
-    ));
+fn on_add_interactable(
+    trigger: Trigger<OnAdd, Interactable>,
+    mut commands: Commands,
+    children: Query<&Children>,
+    //colliders: Query<Entity, Or<(With<Collider>, With<ColliderConstructor>)>>,
+) {
+    commands
+        .entity(trigger.target())
+        .insert((RigidBody::Static, Sensor));
+
+    children
+        .iter_descendants(trigger.target())
+        //.flat_map(|child| colliders.get(child))
+        .for_each(|child| {
+            commands.entity(child).insert(CollisionLayers::new(
+                GameLayer::Interactable,
+                LayerMask::ALL,
+            ));
+        });
+}
+
+#[derive(Debug, InputAction)]
+#[input_action(output = bool)]
+pub struct Interact;
+
+#[derive(Component, Clone, Copy, Reflect, Default)]
+#[reflect(Component, Default)]
+pub enum InteractableEventSource {
+    #[default]
+    None,
+    CycleDisplayMode(usize),
+    MoveControlRod(usize, f32),
+    SelectControlRod(usize),
+    MoveSelectedControlRod(f32),
 }
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
@@ -84,13 +118,44 @@ fn update_interactable_animation_targets(
 
 fn update_interaction_candidate(
     mut candidate: Single<&mut InteractionCandidate, With<Player>>,
-    ray_caster: Single<(&RayCaster, &RayHits), With<PlayerCamera>>,
+    player: Single<&GlobalTransform, With<PlayerCamera>>,
+    spatial_query: SpatialQuery,
+    parents: Query<&ChildOf>,
+    interactables: Query<Entity, With<Interactable>>,
 ) {
-    let (ray, hits) = ray_caster.into_inner();
-    if let Some(hit) = hits.iter_sorted().next() {
-        candidate.0 = Some(hit.entity);
-        info!("Found interactable: {:?}", hit.entity);
+    let transform = player.compute_transform();
+    let hit = spatial_query.cast_ray(
+        transform.translation,
+        transform.forward(),
+        3.5,
+        true,
+        &SpatialQueryFilter::from_mask(GameLayer::Interactable),
+    );
+    if let Some(hit) = hit {
+        candidate.0 = parents
+            .iter_ancestors(hit.entity)
+            .find(|parent| interactables.get(*parent).is_ok());
     } else {
         candidate.0 = None;
+    }
+}
+
+fn handle_interaction(
+    _trigger: Trigger<Completed<Interact>>,
+    mut commands: Commands,
+    interaction_candidate: Single<&InteractionCandidate, With<Player>>,
+    event_sources: Query<&InteractableEventSource>,
+) {
+    info!("Interaction triggered");
+    if let Some(entity) = interaction_candidate.0 {
+        info!("We have an interactiona candidate: {}", entity);
+        match event_sources.get(entity) {
+            Ok(InteractableEventSource::CycleDisplayMode(display)) => {
+                info!("Cycling display mode");
+                commands.trigger(reactorview::CycleDisplayMode(*display));
+            }
+            Ok(_) => {}
+            Err(_) => {}
+        }
     }
 }

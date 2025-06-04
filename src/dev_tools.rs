@@ -10,7 +10,7 @@ use bevy_inspector_egui::{
     quick::{ResourceInspectorPlugin, WorldInspectorPlugin},
 };
 
-use crate::{screens::Screen, simulation::types::SimulationConfig};
+use crate::{menus::Menu, screens::Screen, simulation::types::SimulationConfig};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(EguiPlugin {
@@ -24,8 +24,9 @@ pub(super) fn plugin(app: &mut App) {
         PhysicsDebugPlugin::default(),
     ));
 
-    // Log `Screen` state transitions.
+    // Log `Screen` and `Menu` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);
+    app.add_systems(Update, log_transitions::<Menu>);
 
     // Toggle the debug overlay for UI.
     app.add_systems(

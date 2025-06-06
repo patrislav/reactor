@@ -2,7 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 use bevy_enhanced_input::{events::Completed, prelude::InputAction};
 
-use crate::reactorview;
+use crate::{gameplay::event_handling, reactorview};
 
 use super::{
     GameLayer,
@@ -68,10 +68,26 @@ pub struct Interact;
 pub enum InteractableEventSource {
     #[default]
     None,
-    CycleDisplayMode(usize),
-    MoveControlRod(usize, f32),
-    SelectControlRod(usize),
-    MoveSelectedControlRod(f32),
+    CycleDisplayMode {
+        display: usize,
+    },
+    MoveControlRod {
+        cell: usize,
+        delta: f32,
+    },
+    SelectControlRod {
+        cell: usize,
+    },
+    MoveSelectedControlRod {
+        delta: f32,
+    },
+    ToggleValve {
+        valve: usize,
+    },
+    ChangePumpPower {
+        pump: usize,
+        delta: f32,
+    },
 }
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
@@ -148,11 +164,19 @@ fn handle_interaction(
 ) {
     info!("Interaction triggered");
     if let Some(entity) = interaction_candidate.0 {
-        info!("We have an interactiona candidate: {}", entity);
+        info!("We have an interaction candidate: {}", entity);
         match event_sources.get(entity) {
-            Ok(InteractableEventSource::CycleDisplayMode(display)) => {
+            Ok(InteractableEventSource::CycleDisplayMode { display }) => {
                 info!("Cycling display mode");
-                commands.trigger(reactorview::CycleDisplayMode(*display));
+                commands.trigger(reactorview::view::CycleDisplayMode(*display));
+            }
+            Ok(InteractableEventSource::SelectControlRod { cell }) => {
+                info!("Switching selected control rod to cell {cell}");
+                commands.trigger(event_handling::SelectControlRod(*cell));
+            }
+            Ok(InteractableEventSource::MoveSelectedControlRod { delta }) => {
+                info!("Moving selected control rod by {delta}");
+                commands.trigger(event_handling::MoveSelectedControlRod(*delta));
             }
             Ok(_) => {}
             Err(_) => {}

@@ -10,6 +10,7 @@ pub(super) fn plugin(app: &mut App) {
             update_edge_reactivity,
             update_total_reactivity,
             update_temperature,
+            generate_steam,
         )
             .chain(),
     );
@@ -26,11 +27,11 @@ fn update_edge_reactivity(
 ) -> Result {
     for (mut edge_reactivity, edge, child_of) in &mut edges {
         let core = cores.get(child_of.0)?;
-        let Some(first) = core.cells.get(&edge.nodes.0) else {
+        let Some(first) = core.cells_by_pos.get(&edge.nodes.0) else {
             warn!("First node not found");
             continue;
         };
-        let Some(second) = core.cells.get(&edge.nodes.1) else {
+        let Some(second) = core.cells_by_pos.get(&edge.nodes.1) else {
             warn!("Second node not found");
             continue;
         };
@@ -85,11 +86,11 @@ fn update_edge_temperatures(
 ) -> Result {
     for (mut edge_temperature, edge, child_of) in &mut edges {
         let core = cores.get(child_of.0)?;
-        let Some(first) = core.cells.get(&edge.nodes.0) else {
+        let Some(first) = core.cells_by_pos.get(&edge.nodes.0) else {
             warn!("First node not found");
             continue;
         };
-        let Some(second) = core.cells.get(&edge.nodes.1) else {
+        let Some(second) = core.cells_by_pos.get(&edge.nodes.1) else {
             warn!("Second node not found");
             continue;
         };
@@ -110,13 +111,13 @@ fn update_temperature(
             &ReactorCell,
             &ChildOf,
             &Reactivity,
-            &CoolantFlow,
+            &CoolantLevel,
         ),
         Without<ReactorEdge>,
     >,
     edge_temperatures: Query<&Temperature, (With<ReactorEdge>, Without<ReactorCell>)>,
 ) -> Result {
-    for (mut temperature, cell, child_of, reactivity, coolant_flow) in &mut query {
+    for (mut temperature, cell, child_of, reactivity, coolant_level) in &mut query {
         let core = cores.get(child_of.0)?;
 
         let mut neighbor_temp_sum = 0.0;
@@ -130,7 +131,7 @@ fn update_temperature(
         let ambient_temperature = neighbor_temp_sum / 4.;
         let heat_gain = reactivity.0 * config.heat_generation_factor;
         let coolant_temp_diff = temperature.0 - config.coolant_temperature;
-        let heat_loss = coolant_flow.0 * config.coolant_efficiency * coolant_temp_diff;
+        let heat_loss = coolant_level.0 * config.coolant_efficiency * coolant_temp_diff;
         let ambient_temp_diff = temperature.0 - ambient_temperature;
         let passive_heat_loss = ambient_temp_diff * config.temperature_passive_decay_rate;
 
@@ -138,4 +139,99 @@ fn update_temperature(
     }
 
     Ok(())
+}
+
+fn generate_steam(
+    config: Res<SimulationConfig>,
+    mut query: Query<
+        (
+            &mut SteamOutput,
+            &mut CoolantLevel,
+            &mut SteamLevel,
+            &Temperature,
+            &CoolantFlow,
+            &mut Pressure,
+            &SteamPullCapacity,
+        ),
+        With<ReactorCell>,
+    >,
+) {
+    for (
+        mut steam_output,
+        mut coolant_level,
+        mut steam_level,
+        temperature,
+        coolant_flow,
+        mut pressure,
+        steam_pull_capacity,
+    ) in &mut query
+    {
+        // Boiling point of water depends on pressure (roughly 3 degrees per atmosphere)
+        let boiling_point = 100.0 + (pressure.0 - 1.0) * 3.0;
+
+        // Convert water currently in the cell into steam
+        // The higher the temperature, the more water vaporizes
+        if temperature.0 > boiling_point && coolant_level.0 > 0.0 {
+            let heat_excess = temperature.0 - boiling_point;
+            let available_energy = heat_excess * config.energy_per_heat_unit; // total "extra" thermal energy
+
+            let max_steam_from_energy = available_energy / config.energy_required_per_unit;
+            let coolant_boiled = max_steam_from_energy.min(coolant_level.0);
+
+            coolant_level.0 -= coolant_boiled;
+            steam_level.0 += coolant_boiled;
+        }
+
+        let available_space = (1.0 - coolant_level.0).max(0.01); // prevent div by zero
+        let gas_amount = steam_level.0 * config.steam_expansion_ratio;
+        let temp_kelvin = (temperature.0 + 273.15).max(0.0);
+
+        let raw_pressure = (gas_amount * temp_kelvin) / available_space;
+        let curved_pressure = raw_pressure.powf(config.pressure_curve_exponent);
+        pressure.0 = config.nominal_pressure + curved_pressure * config.pressure_scale;
+
+        let potential_steam_output = steam_pull_capacity
+            .0
+            .min(config.steam_pull_factor * (pressure.0 / config.nominal_pressure));
+
+        let volume_excess = (coolant_level.0 + steam_level.0 - 1.0).max(0.0);
+        steam_output.0 = steam_level
+            .0
+            .min(volume_excess)
+            .min(potential_steam_output)
+            .max(0.0);
+        steam_level.0 -= steam_output.0;
+
+        let space_remaining = 1.0 - (coolant_level.0 + steam_level.0);
+        let added_coolant = coolant_flow.0.min(space_remaining);
+        coolant_level.0 += added_coolant;
+    }
+}
+
+#[test]
+fn test_generates_steam() {
+    let mut app = App::new();
+    app.init_resource::<SimulationConfig>();
+
+    app.add_systems(Update, generate_steam);
+
+    let entity = app
+        .world_mut()
+        .spawn((
+            ReactorCell(Position::new(0, 0)),
+            SteamOutput::default(),
+            CoolantLevel::default(),
+            SteamLevel::default(),
+            Temperature::default(),
+            CoolantFlow::default(),
+            Pressure::default(),
+            SteamPullCapacity::default(),
+        ))
+        .id();
+
+    app.update();
+
+    let steam_output = app.world().get::<SteamOutput>(entity).unwrap();
+
+    assert!(steam_output.0 > 0.0, "Steam should be generated");
 }

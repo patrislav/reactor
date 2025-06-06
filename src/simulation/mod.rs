@@ -24,6 +24,9 @@ pub fn spawn_reactor_core(mut commands: Commands, screen: Res<State<Screen>>) {
             rows: 7,
             ..default()
         },
-        StateScoped(*screen.get()),
+        StateScoped(match *screen.get() {
+            Screen::GameplayLoading => Screen::Gameplay,
+            screen => screen,
+        }),
     ));
 }

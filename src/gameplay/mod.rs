@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 mod crosshair;
 mod crt;
+pub mod event_handling;
 mod game_object;
 mod interaction;
 mod level;
@@ -26,5 +27,7 @@ pub fn plugin(app: &mut App) {
         interaction::plugin,
         reactor_screens::plugin,
         crt::plugin,
+        event_handling::plugin,
+        game_object::plugin,
     ));
 }

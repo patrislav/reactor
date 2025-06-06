@@ -9,7 +9,7 @@ use bevy::{
     },
 };
 
-use crate::{reactorview::ReactorViewRenderLayer, screens::Screen};
+use crate::screens::Screen;
 
 use super::crt::{CrtExtension, CrtMaterial};
 

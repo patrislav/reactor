@@ -1,7 +1,10 @@
 //! Spawn the main level.
 
 use avian3d::prelude::{Collider, ColliderConstructor};
-use bevy::prelude::*;
+use bevy::{
+    core_pipeline::{bloom::Bloom, tonemapping::Tonemapping},
+    prelude::*,
+};
 
 use crate::{asset_tracking::LoadResource, audio::music, screens::Screen};
 
@@ -83,7 +86,9 @@ fn spawn_player(mut commands: Commands, level: Single<Entity, With<Level>>) {
             AmbientLight {
                 brightness: 1000.,
                 ..default()
-            }
+            },
+            Tonemapping::TonyMcMapface,
+            Bloom::NATURAL,
         )],
     ));
 }

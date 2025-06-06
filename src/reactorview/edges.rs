@@ -13,48 +13,54 @@ use bevy::{
     sprite::{Material2d, Material2dKey, Material2dPlugin},
 };
 
+use super::material::EdgeMaterial;
+
 use crate::{screens::Screen, simulation::types::*};
 
-use super::{
-    CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink, ReactorViewAssets,
-    ReactorViewRenderLayer,
-};
+use super::ReactorViewAssets;
+use super::view::{CELL_SIZE, DisplayMode, EDGE_WIDTH, Grid, ReactorCellLink};
 
-pub(super) fn plugin(app: &mut App) {
-    app.add_plugins(Material2dPlugin::<EdgeMaterial>::default());
-    app.add_systems(Update, sync_reactor_edges_with_display);
-    app.add_systems(Update, sync_display_edge_positions);
-    app.add_systems(Update, sync_display_edge_visibility);
+pub(super) fn plugin<const N: usize>(app: &mut App) {
+    app.register_type::<DisplayReactorEdge<N>>();
+    app.register_type::<ReactorEdgeDisplayLink<N>>();
+
+    app.add_systems(Update, sync_reactor_edges_with_display::<N>);
+    app.add_systems(Update, sync_display_edge_positions::<N>);
+    app.add_systems(Update, sync_display_edge_visibility::<N>);
 }
 
 #[derive(Component, Clone, Copy, Reflect)]
-struct DisplayReactorEdge {
+struct DisplayReactorEdge<const N: usize> {
     sim_edge: Entity,
     nodes: (Entity, Entity),
+    coolant_channel: bool,
 }
 
 #[derive(Component, Clone, Copy, Reflect)]
-struct ReactorEdgeDisplayLink(Entity);
+struct ReactorEdgeDisplayLink<const N: usize>(Entity);
 
-fn sync_reactor_edges_with_display(
+fn sync_reactor_edges_with_display<const N: usize>(
     mut commands: Commands,
     assets: Res<ReactorViewAssets>,
-    edges: Query<(Entity, &ReactorEdge, &Name), Without<ReactorEdgeDisplayLink>>,
+    edges: Query<
+        (Entity, &ReactorEdge, Option<&ReactorCoolantEdge>, &Name),
+        Without<ReactorEdgeDisplayLink<N>>,
+    >,
     core: Single<&ReactorCore>,
-    grid: Single<(Entity, &Grid, &RenderLayers)>,
-    display_cells: Query<&GlobalTransform, With<ReactorCellLink>>,
+    grid: Single<(Entity, &Grid<N>, &RenderLayers)>,
+    display_cells: Query<&GlobalTransform, With<ReactorCellLink<N>>>,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
     mut materials: ResMut<Assets<EdgeMaterial>>,
 ) -> Result {
     let (grid_entity, grid, render_layers) = grid.into_inner();
-    for (edge_entity, edge, edge_name) in &edges {
+    for (edge_entity, edge, maybe_coolant_edge, edge_name) in &edges {
         let first_cell = core
-            .cells
+            .cells_by_pos
             .get(&edge.nodes.0)
             .ok_or(anyhow::format_err!("No cell found"))?;
         let second_cell = core
-            .cells
+            .cells_by_pos
             .get(&edge.nodes.1)
             .ok_or(anyhow::format_err!("No cell found"))?;
 
@@ -82,9 +88,10 @@ fn sync_reactor_edges_with_display(
             .spawn((
                 Name::new(format!("Display for {}", edge_name)),
                 ChildOf(grid_entity),
-                DisplayReactorEdge {
+                DisplayReactorEdge::<N> {
                     sim_edge: edge_entity,
                     nodes: (first_display_cell, second_display_cell),
+                    coolant_channel: maybe_coolant_edge.is_some(),
                 },
                 Mesh2d(mesh),
                 MeshMaterial2d(material),
@@ -95,15 +102,15 @@ fn sync_reactor_edges_with_display(
         debug!("Spawned view edge: {:?}", display_entity);
         commands
             .entity(edge_entity)
-            .insert(ReactorEdgeDisplayLink(display_entity));
+            .insert(ReactorEdgeDisplayLink::<N>(display_entity));
     }
 
     Ok(())
 }
 
-fn sync_display_edge_positions(
-    mut edges: Query<(&mut Transform, &DisplayReactorEdge)>,
-    cells: Query<&GlobalTransform, With<ReactorCellLink>>,
+fn sync_display_edge_positions<const N: usize>(
+    mut edges: Query<(&mut Transform, &DisplayReactorEdge<N>)>,
+    cells: Query<&GlobalTransform, With<ReactorCellLink<N>>>,
 ) -> Result {
     for (mut edge_transform, edge) in &mut edges {
         let t1 = cells.get(edge.nodes.0)?.translation().xy();
@@ -120,50 +127,23 @@ fn sync_display_edge_positions(
     Ok(())
 }
 
-fn sync_display_edge_visibility(
+fn sync_display_edge_visibility<const N: usize>(
     mut commands: Commands,
-    mut events: EventReader<StateTransitionEvent<DisplayMode>>,
-    edges: Query<Entity, With<DisplayReactorEdge>>,
+    mut events: EventReader<StateTransitionEvent<DisplayMode<N>>>,
+    edges: Query<(Entity, &DisplayReactorEdge<N>)>,
 ) {
     for event in events.read() {
-        for edge in &edges {
+        for (entity, edge) in &edges {
             if let Some(state) = event.entered {
-                let visibility = match state.edges_visible() {
-                    true => Visibility::Inherited,
-                    false => Visibility::Hidden,
+                let visibility = if (edge.coolant_channel && state.coolant_channels_visible())
+                    || state.edges_visible()
+                {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
                 };
-                commands.entity(edge).insert(visibility);
+                commands.entity(entity).insert(visibility);
             }
         }
-    }
-}
-
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct EdgeMaterial {
-    #[texture(100)]
-    #[sampler(101)]
-    pub texture: Handle<Image>,
-}
-
-impl Material2d for EdgeMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/edge.wgsl".into()
-    }
-
-    fn vertex_shader() -> ShaderRef {
-        "shaders/edge.wgsl".into()
-    }
-
-    fn specialize(
-        descriptor: &mut RenderPipelineDescriptor,
-        layout: &MeshVertexBufferLayoutRef,
-        _key: Material2dKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        let vertex_layout = layout.0.get_layout(&[
-            Mesh::ATTRIBUTE_POSITION.at_shader_location(0),
-            Mesh::ATTRIBUTE_UV_0.at_shader_location(1),
-        ])?;
-        descriptor.vertex.buffers = vec![vertex_layout];
-        Ok(())
     }
 }

@@ -5,10 +5,7 @@ use bevy::{
     ui::Val::*,
 };
 
-use crate::{
-    Pause, menus::Menu, reactorview::ReactorViewRenderLayer, screens::Screen,
-    simulation::spawn_reactor_core,
-};
+use crate::{Pause, menus::Menu, screens::Screen, simulation::spawn_reactor_core};
 
 pub(super) fn plugin(app: &mut App) {
     // Toggle pause on key press.
@@ -27,19 +24,12 @@ pub(super) fn plugin(app: &mut App) {
             ),
         ),
     );
-    app.add_systems(
-        OnEnter(Screen::GameplayLoading),
-        (insert_render_layers, spawn_reactor_core),
-    );
+    app.add_systems(OnEnter(Screen::GameplayLoading), spawn_reactor_core);
     app.add_systems(OnExit(Screen::Gameplay), (close_menu, unpause));
     app.add_systems(
         OnEnter(Menu::None),
         unpause.run_if(in_state(Screen::Gameplay)),
     );
-}
-
-fn insert_render_layers(mut commands: Commands) {
-    commands.insert_resource(ReactorViewRenderLayer(RenderLayers::layer(1)));
 }
 
 fn unpause(mut next_pause: ResMut<NextState<Pause>>) {

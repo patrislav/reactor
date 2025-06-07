@@ -155,6 +155,8 @@ jobs:
     name: Check web
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      RUSTFLAGS: --cfg getrandom_backend="wasm_js"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

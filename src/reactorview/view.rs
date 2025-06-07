@@ -15,6 +15,8 @@ use crate::{
     },
 };
 
+use super::edges::DisplayReactorEdge;
+
 pub fn plugin<const N: usize>(app: &mut App) {
     app.init_state::<DisplayMode<N>>();
 
@@ -61,12 +63,12 @@ pub enum DisplayMode<const N: usize> {
 }
 
 impl<const N: usize> DisplayMode<N> {
-    pub fn edges_visible(&self) -> bool {
-        *self == Self::Temperature
-    }
-
-    pub fn coolant_channels_visible(&self) -> bool {
-        *self == Self::Cooling
+    pub fn edge_visible(&self, edge: &DisplayReactorEdge<N>) -> bool {
+        match *self {
+            Self::Temperature => true,
+            Self::Cooling => edge.valve.is_some(),
+            _ => false,
+        }
     }
 }
 
@@ -76,7 +78,7 @@ pub struct Grid<const N: usize> {
 }
 
 #[derive(Component, Clone, Copy, Reflect)]
-pub struct ReactorCellLink<const N: usize>(Entity);
+pub struct ReactorCellLink<const N: usize>(pub Entity);
 
 #[derive(Component, Clone, Default, Reflect)]
 struct ParameterLinks<const N: usize>(HashMap<TypeId, Entity>);

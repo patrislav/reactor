@@ -10,6 +10,8 @@ pub(super) fn plugin(app: &mut App) {
         .register_type::<LocalReactivity>()
         .register_type::<ControlRod>()
         .register_type::<Pressure>()
+        .register_type::<SteamPullCapacity>()
+        .register_type::<SteamLevel>()
         .register_type::<SteamOutput>()
         .register_type::<CoolantValve>()
         .register_type::<CoolantCircuit>()
@@ -64,6 +66,12 @@ pub struct SimulationConfig {
 
     /// How much steam can be pulled per tick per unit pressure
     pub steam_pull_factor: f32,
+
+    /// How much steam can be pulled per tick in total per cell
+    pub steam_pull_capacity: f32,
+
+    /// Total coolant flow per pump at maximum power
+    pub max_pump_coolant_flow: f32,
 }
 
 impl Default for SimulationConfig {
@@ -72,16 +80,16 @@ impl Default for SimulationConfig {
             base_reactivity: 1.0,
             void_reactivity_boost: 1.5,
             reactivity_neighbor_coupling_factor: 0.2,
-            heat_generation_factor: 5.0,
+            heat_generation_factor: 17.5,
             coolant_temperature: 40.0,
             coolant_efficiency: 0.1,
             temperature_passive_decay_rate: 0.01,
-            energy_per_heat_unit: 10.0,
-            energy_required_per_unit: 2000.0,
+            energy_per_heat_unit: 1.0,
+            energy_required_per_unit: 2.0,
             steam_expansion_ratio: 100.0,
             pressure_curve_exponent: 1.2,
             nominal_pressure: 1.0,
-            pressure_scale: 0.01,
+            pressure_scale: 0.001,
             steam_pull_factor: 0.2,
         }
     }
@@ -95,6 +103,9 @@ pub struct Temperature(pub f32);
 impl Default for Temperature {
     fn default() -> Self {
         Self(25.0)
+            max_pump_coolant_flow: 12.0, // 1 per cell
+            steam_pull_capacity: 50.0,
+        }
     }
 }
 
@@ -154,15 +165,37 @@ impl Default for ControlRod {
 #[reflect(Component)]
 pub struct CoolantValve {
     pub open: bool,
-    pub cells: Vec<Entity>,
 }
+
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
+#[relationship_target(relationship = CellOf)]
+pub struct Cells(Vec<Entity>);
+
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
+#[relationship(relationship_target = Cells)]
+pub struct CellOf(Entity);
 
 #[derive(Component, Clone, Reflect)]
 #[reflect(Component)]
 pub struct CoolantCircuit {
     pub power: f32,
-    pub valves: Vec<Entity>,
 }
+
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
+#[relationship_target(relationship = ValveOf)]
+pub struct Valves(Vec<Entity>);
+
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
+#[relationship(relationship_target = Valves)]
+pub struct ValveOf(Entity);
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct CoolantCircuitLink(pub Entity);
 
 #[derive(Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
 pub struct Position {
@@ -191,18 +224,7 @@ impl Position {
 
 #[derive(Component, Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
 #[reflect(Component)]
-#[require(
-    ControlRod,
-    LocalReactivity,
-    Reactivity,
-    Temperature,
-    Pressure,
-    CoolantLevel,
-    CoolantFlow,
-    SteamPullCapacity,
-    SteamLevel,
-    SteamOutput
-)]
+#[require(ControlRod, LocalReactivity, Reactivity, Pressure, Coolant, Steam)]
 pub struct ReactorCell(pub Position);
 
 #[derive(Component, Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
@@ -234,9 +256,9 @@ impl ReactorEdge {
     }
 }
 
-#[derive(Component, Clone, Copy, Default, Reflect)]
+#[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
-pub struct ReactorCoolantEdge;
+pub struct ReactorCoolantEdge(pub Entity);
 
 #[derive(Component, Clone)]
 pub struct ReactorCore {
@@ -327,7 +349,14 @@ fn on_add_reactor_core(
         [14, 10, 7, 21, 17, 13, 24, 20, 16, 23, 19, 22],
     ];
 
-    for circuit in circuits {
+    for (i, circuit) in circuits.iter().copied().enumerate() {
+        let circuit_entity = commands
+            .spawn((
+                Name::new(format!("Pump circuit {}", i)),
+                ChildOf(trigger.target()),
+                CoolantCircuit { power: 0.2 },
+            ))
+            .id();
         circuit
             .chunks(3)
             .enumerate()
@@ -339,15 +368,13 @@ fn on_add_reactor_core(
                 let valve_entity = commands
                     .spawn((
                         Name::new(format!("Valve {}", valve_index)),
-                        ChildOf(trigger.target()),
-                        CoolantValve {
-                            open: false,
-                            cells: cells.clone(),
-                        },
+                        ChildOf(circuit_entity),
+                        CoolantValve { open: true },
                     ))
                     .id();
                 for cell_entity in cells {
                     core.valve_by_cell.insert(cell_entity, valve_entity);
+                    commands.entity(cell_entity).insert(ChildOf(valve_entity));
                 }
             });
     }
@@ -376,8 +403,10 @@ fn on_add_reactor_core(
                     .id();
                 core.edges.insert((pos, other), edge_entity);
 
-                if this_valve == other_valve {
-                    commands.entity(edge_entity).insert(ReactorCoolantEdge);
+                if this_valve.is_some() && this_valve == other_valve {
+                    commands
+                        .entity(edge_entity)
+                        .insert(ReactorCoolantEdge(this_valve.unwrap()));
                 }
             }
         }

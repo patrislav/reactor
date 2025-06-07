@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
+    prelude::*,
+};
 
 use crate::{asset_tracking::LoadResource, simulation::types::*};
 
@@ -30,7 +33,17 @@ impl FromWorld for ReactorViewAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.resource::<AssetServer>();
         Self {
-            arrow_texture: assets.load("textures/arrow.png"),
+            arrow_texture: assets.load_with_settings("textures/arrow.png", |s: &mut _| {
+                *s = ImageLoaderSettings {
+                    sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                        // rewriting mode to repeat image,
+                        address_mode_u: ImageAddressMode::Repeat,
+                        address_mode_v: ImageAddressMode::Repeat,
+                        ..default()
+                    }),
+                    ..default()
+                }
+            }),
         }
     }
 }

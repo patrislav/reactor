@@ -14,7 +14,7 @@ pub fn plugin(app: &mut App) {
     app.register_type::<VariableStandardMaterial>();
     app.register_type::<Option<LinearRgba>>();
     app.register_type::<Option<StandardMaterial>>();
-    app.register_type::<AnimateTransform>();
+    app.register_type::<InterpolateTransform>();
 
     app.add_event::<PropertyChanged<ReactorCell, ControlRodStatus>>();
     app.add_event::<RequestProperty<ReactorCell, ControlRodStatus>>();
@@ -22,11 +22,11 @@ pub fn plugin(app: &mut App) {
     app.add_observer(on_add_variable_dependent::<VariableColorMaterial>);
     app.add_observer(on_add_variable_dependent::<VariableEmissiveMaterial>);
     app.add_observer(on_add_variable_dependent::<VariableStandardMaterial>);
-    app.add_observer(on_add_variable_dependent::<AnimateTransform>);
+    app.add_observer(on_add_variable_dependent::<InterpolateTransform>);
 
     app.add_systems(Update, update_color_materials);
     app.add_systems(Update, update_emissive_materials);
-    app.add_systems(Update, update_animate_transforms);
+    app.add_systems(Update, interpolate_transforms);
 }
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
@@ -35,7 +35,8 @@ enum VariableGetter {
     #[default]
     None,
     ControlRodStatus(usize),
-    //PumpStatus(usize),
+    ValveStatus(usize),
+    PumpPowerLevel(usize),
 }
 
 #[derive(Component, Clone, Reflect)]
@@ -143,12 +144,12 @@ impl VariableStandardMaterial {
 
 #[derive(Component, Clone, Default, Reflect)]
 #[reflect(Component)]
-struct AnimateTransform {
+struct InterpolateTransform {
     from: Transform,
     to: Transform,
 }
 
-impl AnimateTransform {
+impl InterpolateTransform {
     fn interpolate(&self, s: f32) -> Transform {
         let s = s.clamp(0.0, 1.0);
         Transform {
@@ -187,6 +188,7 @@ where
                 *cell_index,
             );
         }
+        _ => {}
     }
 
     commands
@@ -280,13 +282,13 @@ fn update_standard_materials(
     }
 }
 
-fn update_animate_transforms(
+fn interpolate_transforms(
     mut commands: Commands,
-    query: Query<(Entity, &AnimateTransform, &VariableValue<f32>), Changed<VariableValue<f32>>>,
+    query: Query<(Entity, &InterpolateTransform, &VariableValue<f32>), Changed<VariableValue<f32>>>,
 ) {
-    for (entity, animate_transform, value) in &query {
+    for (entity, interpolate_transform, value) in &query {
         commands
             .entity(entity)
-            .insert(animate_transform.interpolate(value.0));
+            .insert(interpolate_transform.interpolate(value.0));
     }
 }

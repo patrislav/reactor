@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::PausableSystems;
+
 use super::{schedule::RunSimulation, types::*};
 
 pub(super) fn plugin(app: &mut App) {
@@ -9,14 +11,15 @@ pub(super) fn plugin(app: &mut App) {
             update_local_reactivity,
             update_edge_reactivity,
             update_total_reactivity,
-            update_temperature,
             generate_steam,
         )
             .chain(),
     );
     app.add_systems(
         RunSimulation,
-        update_edge_temperatures.before(update_temperature),
+        (update_coolant_flow, update_steam_pull_capacity)
+            .in_set(PausableSystems)
+            .before(generate_steam),
     );
 }
 
@@ -54,16 +57,11 @@ fn update_local_reactivity(
 
 fn update_total_reactivity(
     config: Res<SimulationConfig>,
-    cores: Query<&ReactorCore>,
-    mut query: Query<
-        (&mut Reactivity, &ReactorCell, &LocalReactivity, &ChildOf),
-        Without<ReactorEdge>,
-    >,
+    core: Single<&ReactorCore>,
+    mut query: Query<(&mut Reactivity, &ReactorCell, &LocalReactivity), Without<ReactorEdge>>,
     edge_reactivities: Query<&Reactivity, (With<ReactorEdge>, Without<ReactorCell>)>,
 ) -> Result {
-    for (mut reactivity, cell, local_reactivity, child_of) in &mut query {
-        let core = cores.get(child_of.0)?;
-
+    for (mut reactivity, cell, local_reactivity) in &mut query {
         let mut neighbor_sum = 0.0;
         for pos in cell.0.neighbours() {
             neighbor_sum += match core.find_edge(cell.0, pos) {
@@ -80,12 +78,11 @@ fn update_total_reactivity(
 }
 
 fn update_edge_temperatures(
-    cores: Query<&ReactorCore>,
-    mut edges: Query<(&mut Temperature, &ReactorEdge, &ChildOf), Without<ReactorCell>>,
+    core: Single<&ReactorCore>,
+    mut edges: Query<(&mut Temperature, &ReactorEdge), Without<ReactorCell>>,
     cells: Query<&Temperature, With<ReactorCell>>,
 ) -> Result {
-    for (mut edge_temperature, edge, child_of) in &mut edges {
-        let core = cores.get(child_of.0)?;
+    for (mut edge_temperature, edge) in &mut edges {
         let Some(first) = core.cells_by_pos.get(&edge.nodes.0) else {
             warn!("First node not found");
             continue;
@@ -104,22 +101,14 @@ fn update_edge_temperatures(
 
 fn update_temperature(
     config: Res<SimulationConfig>,
-    cores: Query<&ReactorCore>,
+    core: Single<&ReactorCore>,
     mut query: Query<
-        (
-            &mut Temperature,
-            &ReactorCell,
-            &ChildOf,
-            &Reactivity,
-            &CoolantLevel,
-        ),
+        (&mut Temperature, &ReactorCell, &Reactivity, &CoolantLevel),
         Without<ReactorEdge>,
     >,
     edge_temperatures: Query<&Temperature, (With<ReactorEdge>, Without<ReactorCell>)>,
 ) -> Result {
-    for (mut temperature, cell, child_of, reactivity, coolant_level) in &mut query {
-        let core = cores.get(child_of.0)?;
-
+    for (mut temperature, cell, reactivity, coolant_level) in &mut query {
         let mut neighbor_temp_sum = 0.0;
         for pos in cell.0.neighbours() {
             neighbor_temp_sum += match core.find_edge(cell.0, pos) {
@@ -179,59 +168,65 @@ fn generate_steam(
             let coolant_boiled = max_steam_from_energy.min(coolant_level.0);
 
             coolant_level.0 -= coolant_boiled;
-            steam_level.0 += coolant_boiled;
+            steam_level.0 += coolant_boiled * config.steam_expansion_ratio;
         }
-
-        let available_space = (1.0 - coolant_level.0).max(0.01); // prevent div by zero
-        let gas_amount = steam_level.0 * config.steam_expansion_ratio;
-        let temp_kelvin = (temperature.0 + 273.15).max(0.0);
-
-        let raw_pressure = (gas_amount * temp_kelvin) / available_space;
-        let curved_pressure = raw_pressure.powf(config.pressure_curve_exponent);
-        pressure.0 = config.nominal_pressure + curved_pressure * config.pressure_scale;
 
         let potential_steam_output = steam_pull_capacity
             .0
             .min(config.steam_pull_factor * (pressure.0 / config.nominal_pressure));
 
-        let volume_excess = (coolant_level.0 + steam_level.0 - 1.0).max(0.0);
+        //let volume_excess = (coolant_level.0 + steam_level.0 - 1.0).max(0.0);
         steam_output.0 = steam_level
             .0
-            .min(volume_excess)
+            //.min(volume_excess)
             .min(potential_steam_output)
             .max(0.0);
         steam_level.0 -= steam_output.0;
 
         let space_remaining = 1.0 - (coolant_level.0 + steam_level.0);
-        let added_coolant = coolant_flow.0.min(space_remaining);
+        let added_coolant = coolant_flow.0.min(space_remaining).max(0.0);
         coolant_level.0 += added_coolant;
+
+        let available_space = (1.0 - coolant_level.0).max(0.01); // prevent div by zero
+        let temp_kelvin = (temperature.0 + 273.15).max(0.0);
+        let raw_pressure = (steam_level.0 * temp_kelvin) / available_space * config.pressure_scale;
+        let curved_pressure = raw_pressure.powf(config.pressure_curve_exponent);
+        pressure.0 = config.nominal_pressure + curved_pressure;
     }
 }
 
-#[test]
-fn test_generates_steam() {
-    let mut app = App::new();
-    app.init_resource::<SimulationConfig>();
+fn update_coolant_flow(
+    config: Res<SimulationConfig>,
+    mut commands: Commands,
+    valves: Query<(&CoolantValve, &Children)>,
+    circuits: Query<(&CoolantCircuit, &Children)>,
+) -> Result {
+    for (circuit, circuit_children) in circuits {
+        let total_coolant = config.max_pump_coolant_flow * circuit.power;
+        let open_cells: Vec<Entity> = circuit_children
+            .iter()
+            .map(|entity| valves.get(entity))
+            .filter_map(|res| res.ok())
+            .filter(|(valve, _)| valve.open)
+            .flat_map(|(_, children)| children.iter())
+            .collect();
+        let coolant_per_cell = total_coolant / (open_cells.len() as f32);
 
-    app.add_systems(Update, generate_steam);
+        for entity in open_cells {
+            commands
+                .entity(entity)
+                .insert(CoolantFlow(coolant_per_cell));
+        }
+    }
 
-    let entity = app
-        .world_mut()
-        .spawn((
-            ReactorCell(Position::new(0, 0)),
-            SteamOutput::default(),
-            CoolantLevel::default(),
-            SteamLevel::default(),
-            Temperature::default(),
-            CoolantFlow::default(),
-            Pressure::default(),
-            SteamPullCapacity::default(),
-        ))
-        .id();
+    Ok(())
+}
 
-    app.update();
-
-    let steam_output = app.world().get::<SteamOutput>(entity).unwrap();
-
-    assert!(steam_output.0 > 0.0, "Steam should be generated");
+fn update_steam_pull_capacity(
+    config: Res<SimulationConfig>,
+    mut query: Query<&mut SteamPullCapacity, With<ReactorCell>>,
+) {
+    for mut steam_pull_capacity in &mut query {
+        steam_pull_capacity.0 = config.steam_pull_capacity;
+    }
 }

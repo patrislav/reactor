@@ -15,8 +15,13 @@ struct VertexOutput {
     @location(0) uv: vec2<f32>,
 };
 
-@group(2) @binding(100) var texture: texture_2d<f32>;
-@group(2) @binding(101) var texture_sampler: sampler;
+@group(2) @binding(100) var mask_texture: texture_2d<f32>;
+@group(2) @binding(101) var mask_sampler: sampler;
+@group(2) @binding(102) var<uniform> scroll_speed: vec2<f32>;
+@group(2) @binding(103) var<uniform> bg_color: vec4<f32>;
+@group(2) @binding(104) var<uniform> fg_color: vec4<f32>;
+@group(2) @binding(105) var<uniform> base_color: vec4<f32>;
+@group(2) @binding(106) var<uniform> intensity: f32;
 
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
@@ -29,7 +34,12 @@ fn vertex(vertex: Vertex) -> VertexOutput {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color = textureSampleBias(texture, texture_sampler, in.uv, view.mip_bias);
-    return color;
+    let scrolled_uv = fract(in.uv + scroll_speed * globals.time);
+    let mask = textureSample(mask_texture, mask_sampler, scrolled_uv);
+
+    let final_bg = mix(base_color, bg_color, intensity);
+    let final_fg = mix(base_color, fg_color, intensity);
+
+    return mix(final_bg, final_fg, mask.r);
 }
 

@@ -17,7 +17,22 @@ pub(crate) fn plugin(app: &mut App) {
 pub struct EdgeMaterial {
     #[texture(100)]
     #[sampler(101)]
-    pub texture: Handle<Image>,
+    pub mask_texture: Handle<Image>,
+
+    #[uniform(102)]
+    pub scroll_speed: Vec2,
+
+    #[uniform(103)]
+    pub bg_color: LinearRgba,
+
+    #[uniform(104)]
+    pub fg_color: LinearRgba,
+
+    #[uniform(105)]
+    pub base_color: LinearRgba,
+
+    #[uniform(106)]
+    pub intensity: f32,
 }
 
 impl Material2d for EdgeMaterial {

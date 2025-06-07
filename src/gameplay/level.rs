@@ -84,6 +84,7 @@ fn spawn_player(mut commands: Commands, level: Single<Entity, With<Level>>) {
                 ..default()
             },
             AmbientLight {
+                color: LinearRgba::rgb(1.0, 1.0, 1.0).into(),
                 brightness: 1000.,
                 ..default()
             },

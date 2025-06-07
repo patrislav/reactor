@@ -17,6 +17,7 @@ mod theme;
 use avian3d::PhysicsPlugins;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use bevy_skein::SkeinPlugin;
+use simulation::schedule::RunSimulation;
 
 pub struct AppPlugin;
 
@@ -74,6 +75,10 @@ impl Plugin for AppPlugin {
         // Set up the `Pause` state.
         app.init_state::<Pause>();
         app.configure_sets(Update, PausableSystems.run_if(in_state(Pause(false))));
+        app.configure_sets(
+            RunSimulation,
+            PausableSystems.run_if(in_state(Pause(false))),
+        );
     }
 }
 

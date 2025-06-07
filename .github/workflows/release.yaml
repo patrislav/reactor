@@ -206,6 +206,8 @@ jobs:
 
       - name: Build and add web bundle to app (Web)
         if: ${{ env.is_platform_enabled == 'true' && matrix.platform == 'web' }}
+        env:
+          RUSTFLAGS: --cfg getrandom_backend="wasm_js"
         run: |
           cargo binstall --locked --no-confirm --force wasm-bindgen-cli
           cargo binstall --locked --no-confirm --force wasm-opt
@@ -214,8 +216,6 @@ jobs:
 
       - name: Build and add binaries to app (non-Web)
         if: ${{ env.is_platform_enabled == 'true' && matrix.platform != 'web' }}
-        env:
-          RUSTFLAGS: --cfg getrandom_backend="wasm_js"
         run: |
           for target in ${{ matrix.targets }}; do
             bevy build --locked --release --target="${target}" --features='${{ matrix.features }}'

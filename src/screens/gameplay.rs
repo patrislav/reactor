@@ -1,11 +1,8 @@
 //! The screen state for the main gameplay.
 
-use bevy::{
-    input::common_conditions::input_just_pressed, prelude::*, render::view::RenderLayers,
-    ui::Val::*,
-};
+use bevy::{input::common_conditions::input_just_pressed, prelude::*, ui::Val::*};
 
-use crate::{Pause, menus::Menu, screens::Screen, simulation::spawn_reactor_core};
+use crate::{Pause, menus::Menu, screens::Screen};
 
 pub(super) fn plugin(app: &mut App) {
     // Toggle pause on key press.
@@ -24,7 +21,6 @@ pub(super) fn plugin(app: &mut App) {
             ),
         ),
     );
-    app.add_systems(OnEnter(Screen::GameplayLoading), spawn_reactor_core);
     app.add_systems(OnExit(Screen::Gameplay), (close_menu, unpause));
     app.add_systems(
         OnEnter(Menu::None),

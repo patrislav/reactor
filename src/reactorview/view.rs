@@ -197,7 +197,7 @@ pub fn on_add_reactor_core_ready<const N: usize>(
 
     let padding = 10.;
     let container_size = CELL_SIZE + padding * 2.;
-    let mesh = meshes.add(Rectangle::new(CELL_SIZE, CELL_SIZE));
+    let mesh = meshes.add(Circle::new(container_size / 1.8));
 
     for (pos, entity) in core.iter_cells() {
         let cell = commands

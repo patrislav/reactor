@@ -7,7 +7,7 @@ default-run = "reactor"
 
 [dependencies]
 bevy = { version = "0.16", features = ["wayland", "webgpu"] }
-rand = "0.8"
+rand = "0.9"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
@@ -20,17 +20,16 @@ tracing = { version = "0.1", features = [
 ] }
 anyhow = "1.0.98"
 bevy-inspector-egui = "0.31.0"
-bevy_skein = "0.2.1"
-avian3d = "0.3.0"
-bevy_enhanced_input = "0.12.0"
-bevy-tnua = "0.24.0"
-bevy-tnua-avian3d = "0.5.0"
 
 # Your web builds will start failing if you add a dependency that pulls in `getrandom` v0.3+.
 # To fix this, you should tell `getrandom` to use the `wasm_js` backend on Wasm.
 # See: <https://docs.rs/getrandom/0.3.3/getrandom/#webassembly-support>.
-#[target.wasm32-unknown-unknown.dependencies]
-#getrandom = { version = "0.3", features = ["wasm_js"] }
+[target.wasm32-unknown-unknown.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
+
 # In addition to enabling the `wasm_js` feature, you need to include `--cfg 'getrandom_backend="wasm_js"'`
 # in your rustflags for both local and CI/CD web builds, taking into account that rustflags specified in
 # multiple places are NOT combined (see <https://github.com/rust-lang/cargo/issues/5376>).
@@ -68,6 +67,7 @@ default-features = false
 [package.metadata.bevy_cli.web]
 # Disable native features for web builds.
 default-features = false
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
 
 [package.metadata.bevy_cli.web.dev]
 features = ["dev"]
@@ -131,7 +131,3 @@ codegen-units = 4
 
 [profile.ci.package."*"]
 opt-level = 0
-
-[[bin]]
-name = "skein"
-path = "src/skein.rs"

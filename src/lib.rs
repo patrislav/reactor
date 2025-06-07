@@ -7,17 +7,13 @@ pub mod asset_tracking;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
-pub mod gameplay;
+pub mod gameplay2;
 mod menus;
-mod reactorview;
 mod screens;
-mod simulation;
 mod theme;
 
-use avian3d::PhysicsPlugins;
 use bevy::{asset::AssetMetaCheck, prelude::*};
-use bevy_skein::SkeinPlugin;
-use simulation::schedule::RunSimulation;
+use gameplay2::schedule::RunSimulation;
 
 pub struct AppPlugin;
 
@@ -44,16 +40,12 @@ impl Plugin for AppPlugin {
                 }),
         );
         app.add_plugins(MeshPickingPlugin);
-        app.add_plugins(PhysicsPlugins::default());
-        app.add_plugins(SkeinPlugin::default());
 
         // Add other plugins.
         app.add_plugins((
             asset_tracking::plugin,
             audio::plugin,
-            gameplay::plugin,
-            reactorview::plugin,
-            simulation::plugin,
+            gameplay2::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             menus::plugin,

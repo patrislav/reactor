@@ -91,6 +91,8 @@ impl Default for SimulationConfig {
             nominal_pressure: 1.0,
             pressure_scale: 0.001,
             steam_pull_factor: 0.2,
+            steam_pull_capacity: 50.0,
+            max_pump_coolant_flow: 12.0,
         }
     }
 }
@@ -103,9 +105,6 @@ pub struct Temperature(pub f32);
 impl Default for Temperature {
     fn default() -> Self {
         Self(25.0)
-            max_pump_coolant_flow: 12.0, // 1 per cell
-            steam_pull_capacity: 50.0,
-        }
     }
 }
 
@@ -197,6 +196,13 @@ pub struct ValveOf(Entity);
 #[reflect(Component)]
 pub struct CoolantCircuitLink(pub Entity);
 
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub enum Particle {
+    Water,
+    Steam,
+}
+
 #[derive(Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
 pub struct Position {
     pub x: i32,
@@ -224,7 +230,17 @@ impl Position {
 
 #[derive(Component, Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
 #[reflect(Component)]
-#[require(ControlRod, LocalReactivity, Reactivity, Pressure, Coolant, Steam)]
+#[require(
+    ControlRod,
+    LocalReactivity,
+    Reactivity,
+    Pressure,
+    Temperature,
+    CoolantFlow,
+    CoolantLevel,
+    SteamLevel,
+    SteamOutput
+)]
 pub struct ReactorCell(pub Position);
 
 #[derive(Component, Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]

@@ -1,6 +1,5 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
-use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::{
     dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
     ui::UiDebugOptions,
@@ -10,7 +9,7 @@ use bevy_inspector_egui::{
     quick::{ResourceInspectorPlugin, WorldInspectorPlugin},
 };
 
-use crate::{menus::Menu, screens::Screen, simulation::types::SimulationConfig};
+use crate::{menus::Menu, screens::Screen};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(EguiPlugin {
@@ -18,11 +17,7 @@ pub(super) fn plugin(app: &mut App) {
     });
 
     #[cfg(feature = "debug")]
-    app.add_plugins((
-        WorldInspectorPlugin::default(),
-        ResourceInspectorPlugin::<SimulationConfig>::default(),
-        PhysicsDebugPlugin::default(),
-    ));
+    app.add_plugins((WorldInspectorPlugin::default(),));
 
     // Log `Screen` and `Menu` state transitions.
     app.add_systems(Update, log_transitions::<Screen>);

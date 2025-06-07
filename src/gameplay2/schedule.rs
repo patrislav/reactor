@@ -8,7 +8,7 @@ use bevy::{
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RunSimulation;
 
-pub(super) fn plugin(app: &mut App) {
+pub fn plugin(app: &mut App) {
     let mut schedule = Schedule::new(RunSimulation);
     schedule.set_executor_kind(ExecutorKind::SingleThreaded);
 
@@ -25,7 +25,7 @@ pub struct Simulation {
 
 impl Simulation {
     /// Corresponds to 1 Hz.
-    const DEFAULT_TIMESTEP: Duration = Duration::from_secs(1);
+    const DEFAULT_TIMESTEP: Duration = Duration::from_millis(500);
 
     fn accumulate(&mut self, delta: Duration) {
         self.overstep += delta;

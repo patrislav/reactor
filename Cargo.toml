@@ -27,9 +27,6 @@ bevy-inspector-egui = "0.31.0"
 [target.wasm32-unknown-unknown.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
-[target.wasm32-unknown-unknown]
-rustflags = ['--cfg', 'getrandom_backend="wasm_js"']
-
 # In addition to enabling the `wasm_js` feature, you need to include `--cfg 'getrandom_backend="wasm_js"'`
 # in your rustflags for both local and CI/CD web builds, taking into account that rustflags specified in
 # multiple places are NOT combined (see <https://github.com/rust-lang/cargo/issues/5376>).

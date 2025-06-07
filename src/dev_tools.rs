@@ -4,10 +4,10 @@ use bevy::{
     dev_tools::states::log_transitions, input::common_conditions::input_just_pressed, prelude::*,
     ui::UiDebugOptions,
 };
-use bevy_inspector_egui::{
-    bevy_egui::EguiPlugin,
-    quick::{ResourceInspectorPlugin, WorldInspectorPlugin},
-};
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
+
+#[cfg(feature = "debug")]
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 use crate::{menus::Menu, screens::Screen};
 

@@ -11,13 +11,13 @@ pub fn plugin(app: &mut App) {
     app.configure_sets(
         RunSimulation,
         (
-            PhaseSet::WaterFlow
+            PhaseSystems::WaterFlow
                 .run_if(in_state(Phase::WaterFlow))
                 .run_if(in_state(Screen::Gameplay)),
-            PhaseSet::NeutronRelease
+            PhaseSystems::NeutronRelease
                 .run_if(in_state(Phase::NeutronRelease))
                 .run_if(in_state(Screen::Gameplay)),
-            PhaseSet::SteamVenting
+            PhaseSystems::SteamVenting
                 .run_if(in_state(Phase::SteamVenting))
                 .run_if(in_state(Screen::Gameplay)),
         )
@@ -26,12 +26,12 @@ pub fn plugin(app: &mut App) {
 
     app.add_systems(RunSimulation, next_phase.run_if(in_state(Screen::Gameplay)));
 
-    app.add_systems(RunSimulation, create_water.in_set(PhaseSet::WaterFlow));
+    app.add_systems(RunSimulation, create_water.in_set(PhaseSystems::WaterFlow));
     app.add_systems(
         RunSimulation,
-        launch_neutrons.in_set(PhaseSet::NeutronRelease),
+        launch_neutrons.in_set(PhaseSystems::NeutronRelease),
     );
-    app.add_systems(RunSimulation, vent_steam.in_set(PhaseSet::SteamVenting));
+    app.add_systems(RunSimulation, vent_steam.in_set(PhaseSystems::SteamVenting));
 }
 
 #[derive(States, Clone, Copy, Reflect, Default, Debug, Eq, PartialEq, Hash)]
@@ -53,7 +53,7 @@ impl Phase {
 }
 
 #[derive(SystemSet, Clone, Copy, Reflect, Debug, Hash, PartialEq, Eq)]
-pub enum PhaseSet {
+pub enum PhaseSystems {
     WaterFlow,
     NeutronRelease,
     SteamVenting,

@@ -7,13 +7,13 @@ pub mod asset_tracking;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
-pub mod gameplay2;
+pub mod gameplay;
 mod menus;
 mod screens;
 mod theme;
 
 use bevy::{asset::AssetMetaCheck, prelude::*};
-use gameplay2::schedule::RunSimulation;
+use gameplay::schedule::RunSimulation;
 
 pub struct AppPlugin;
 
@@ -45,7 +45,7 @@ impl Plugin for AppPlugin {
         app.add_plugins((
             asset_tracking::plugin,
             audio::plugin,
-            gameplay2::plugin,
+            gameplay::plugin,
             #[cfg(feature = "dev")]
             dev_tools::plugin,
             menus::plugin,

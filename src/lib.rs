@@ -12,6 +12,7 @@ mod menus;
 mod screens;
 mod theme;
 
+use avian2d::PhysicsPlugins;
 use bevy::{asset::AssetMetaCheck, prelude::*};
 use gameplay::schedule::RunSimulation;
 
@@ -39,6 +40,7 @@ impl Plugin for AppPlugin {
                     ..default()
                 }),
         );
+        app.add_plugins(PhysicsPlugins::default());
         app.add_plugins(MeshPickingPlugin);
 
         // Add other plugins.

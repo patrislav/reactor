@@ -1,5 +1,6 @@
 use std::f32::consts::TAU;
 
+use avian2d::prelude::{CollisionEventsEnabled, LayerMask};
 use bevy::prelude::*;
 use rand::Rng;
 
@@ -64,9 +65,7 @@ fn next_phase(state: Res<State<Phase>>, mut next: ResMut<NextState<Phase>>) {
 }
 
 fn create_water(mut commands: Commands) {
-    for _ in 0..WATER_CREATED_PER_TICK {
-        commands.trigger(CreateWaterParticle);
-    }
+    commands.trigger(CreateWaterParticles(WATER_CREATED_PER_TICK));
 }
 
 fn launch_neutrons(
@@ -78,12 +77,20 @@ fn launch_neutrons(
         // TODO: more than one neutron should be launched
         let cell = transform.translation();
         if reactivity.0 > rng.random_range(0.0..1.0) {
+            let mut layer_mask = LayerMask::ALL;
+            layer_mask.remove(GameLayer::Neutron);
+
             commands.spawn((
+                Name::new("Neutron"),
                 Neutron::default(),
                 Expiry(Timer::from_seconds(NEUTRON_LIFETIME_SEC, TimerMode::Once)),
                 CurrentAngle(rng.random_range(0.0..TAU)),
                 Origin(entity),
                 Transform::from_xyz(cell.x, cell.y, 25.),
+                RigidBody::Kinematic,
+                Collider::circle(NEUTRON_RADIUS),
+                CollisionLayers::new(GameLayer::Neutron, layer_mask),
+                CollisionEventsEnabled,
             ));
         }
     }
@@ -91,32 +98,44 @@ fn launch_neutrons(
 
 fn vent_steam(
     mut commands: Commands,
-    particles: Query<(Entity, &GlobalTransform, &ChildOf, &Lifetime), With<Particle>>,
-    mut cells: Query<&mut ParticleCount>,
-    container: Single<(Entity, &GlobalTransform, &mut ParticleContainer), With<SteamContainer>>,
+    steam_particles: Query<(Entity, &GlobalTransform, &Lifetime), With<Particle>>,
+    mut cells: Query<(&mut ParticleCount, &Children)>,
+    container: Single<(Entity, &GlobalTransform), With<SteamContainer>>,
 ) {
-    let (container_entity, container_transform, mut container) = container.into_inner();
+    let (container_entity, container_transform) = container.into_inner();
 
-    let mut particles: Vec<_> = particles.iter().collect();
-    particles.sort_by(|(_, _, _, a), (_, _, _, b)| {
-        b.0.elapsed()
-            .partial_cmp(&a.0.elapsed())
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    for (mut particle_count, children) in &mut cells {
+        let mut particles: Vec<_> = children
+            .iter()
+            .flat_map(|entity| steam_particles.get(entity))
+            .collect();
+        particles.sort_by(|(_, _, a), (_, _, b)| {
+            b.0.elapsed()
+                .partial_cmp(&a.0.elapsed())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
-    let vented_particles = particles.into_iter().take(STEAM_VENTED_PER_TICK);
-    for (entity, particle_transform, child_of, _) in vented_particles {
-        if let Ok(mut particle_count) = cells.get_mut(child_of.0) {
-            particle_count.0 -= 1;
+        let vented_particles = particles.into_iter().take(STEAM_VENTED_PER_TICK);
+        for (entity, particle_transform, _) in vented_particles {
+            if particle_count.0 > 0 {
+                particle_count.0 -= 1;
+            }
+
+            let new_transform = particle_transform.reparented_to(container_transform);
+            commands
+                .entity(entity)
+                .remove::<Lifetime>()
+                .remove::<TargetAngle>()
+                .remove::<EasedMotion>()
+                .remove::<InCell>()
+                .insert((ChildOf(container_entity), new_transform));
+            commands.trigger_targets(
+                MoveParticle {
+                    to: Vec2::new(0.0, 0.0),
+                    stop_current: false,
+                },
+                entity,
+            );
         }
-
-        let new_transform = particle_transform.reparented_to(container_transform);
-        commands
-            .entity(entity)
-            .remove::<Lifetime>()
-            .remove::<TargetAngle>()
-            .remove::<EasedMotion>()
-            .insert((ChildOf(container_entity), new_transform));
-        container.0.push(entity);
     }
 }

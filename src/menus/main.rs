@@ -15,16 +15,16 @@ fn spawn_main_menu(mut commands: Commands) {
         StateScoped(Menu::Main),
         #[cfg(not(target_family = "wasm"))]
         children![
-            widget::button("Play", enter_loading_or_gameplay_screen),
-            widget::button("Settings", open_settings_menu),
-            widget::button("Credits", open_credits_menu),
-            widget::button("Exit", exit_app),
+            widget::button("play", enter_loading_or_gameplay_screen),
+            widget::button("settings", open_settings_menu),
+            widget::button("credist", open_credits_menu),
+            widget::button("exit", exit_app),
         ],
         #[cfg(target_family = "wasm")]
         children![
-            widget::button("Play", enter_loading_or_gameplay_screen),
-            widget::button("Settings", open_settings_menu),
-            widget::button("Credits", open_credits_menu),
+            widget::button("play", enter_loading_or_gameplay_screen),
+            widget::button("settings", open_settings_menu),
+            widget::button("exit", open_credits_menu),
         ],
     ));
 }

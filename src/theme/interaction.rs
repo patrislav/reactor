@@ -19,6 +19,9 @@ pub struct PlaysHoverSound;
 #[derive(Component, Copy, Clone, Reflect, Default)]
 pub struct PlaysClickSound;
 
+#[derive(Component, Copy, Clone, Reflect, Default)]
+pub struct UseBoldFont;
+
 /// Palette for widget interactions. Add this to an entity that supports
 /// [`Interaction`]s, such as a button, to change its [`BackgroundColor`] based
 /// on the current interaction state.
@@ -54,7 +57,9 @@ struct InteractionAssets {
     #[dependency]
     click: Handle<AudioSource>,
     #[dependency]
-    font: Handle<Font>,
+    font_light: Handle<Font>,
+    #[dependency]
+    font_bold: Handle<Font>,
 }
 
 impl FromWorld for InteractionAssets {
@@ -63,7 +68,8 @@ impl FromWorld for InteractionAssets {
         Self {
             hover: assets.load("audio/sound_effects/button_hover.ogg"),
             click: assets.load("audio/sound_effects/button_click.ogg"),
-            font: assets.load("fonts/Lato-Light.ttf"),
+            font_light: assets.load("fonts/Lato-Light.ttf"),
+            font_bold: assets.load("fonts/Lato-Bold.ttf"),
         }
     }
 }
@@ -101,9 +107,13 @@ fn play_on_click_sound_effect(
 fn set_font(
     trigger: Trigger<OnAdd, TextFont>,
     assets: Res<InteractionAssets>,
-    mut query: Query<&mut TextFont>,
+    mut query: Query<(&mut TextFont, Option<&UseBoldFont>)>,
 ) {
-    if let Ok(mut text_font) = query.get_mut(trigger.target()) {
-        text_font.font = assets.font.clone();
+    if let Ok((mut text_font, use_bold_font)) = query.get_mut(trigger.target()) {
+        text_font.font = if use_bold_font.is_some() {
+            assets.font_bold.clone()
+        } else {
+            assets.font_light.clone()
+        }
     }
 }

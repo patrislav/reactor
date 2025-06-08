@@ -18,10 +18,10 @@ fn spawn_pause_menu(mut commands: Commands) {
         GlobalZIndex(2),
         StateScoped(Menu::Pause),
         children![
-            widget::header("Game paused"),
-            widget::button("Continue", close_menu),
-            widget::button("Settings", open_settings_menu),
-            widget::button("Quit to title", quit_to_title),
+            widget::header("game paused"),
+            widget::button("continue", close_menu),
+            widget::button("settings", open_settings_menu),
+            widget::button("abandon game", quit_to_title),
         ],
     ));
 }

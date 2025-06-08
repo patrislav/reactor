@@ -1,3 +1,4 @@
+use avian2d::prelude::PhysicsLayer;
 use bevy::{platform::collections::HashMap, prelude::*, time::Stopwatch};
 
 use super::*;
@@ -11,8 +12,6 @@ pub fn plugin(app: &mut App) {
     app.register_type::<TargetAngle>();
     app.register_type::<CurrentScale>();
     app.register_type::<TargetScale>();
-    app.register_type::<CurrentControlRod>();
-    app.register_type::<TargetControlRod>();
 }
 
 #[derive(Component, Clone, Copy, Debug, Reflect, Eq, PartialEq)]
@@ -91,14 +90,41 @@ pub struct ParticleCount(pub usize);
 #[reflect(Component)]
 pub struct Cell(pub Position);
 
-#[derive(Component, Clone, Copy, Reflect, Default)]
-#[require(Reactivity)]
+#[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
-pub struct CurrentControlRod(pub f32);
+pub struct InCell;
 
-#[derive(Component, Clone, Copy, Reflect, Default)]
+#[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
-pub struct TargetControlRod(pub f32);
+pub struct ControlRod(pub Position);
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct ControlRodInsertion(pub f32);
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub enum ControlRodMovement {
+    Up,
+    Down,
+}
+
+impl ControlRodMovement {
+    pub fn reverse(&mut self) {
+        *self = match self {
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct ControlRodMovementIndicator;
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct ControlRodInsertionIndicator;
 
 #[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
@@ -133,8 +159,8 @@ impl Position {
     }
 }
 
-#[derive(Component)]
-pub struct Cleanup;
+#[derive(Event)]
+pub struct Cleanup(pub Entity);
 
 #[derive(Component, Clone, Reflect)]
 #[reflect(Component)]
@@ -177,12 +203,16 @@ impl ReactorCore {
             .map(|pos| (pos, self.cells_by_pos.get(&pos).copied()))
     }
 
-    pub fn iter_valid_positions(&self) -> impl Iterator<Item = Position> + '_ {
+    pub fn iter_cell_positions(&self) -> impl Iterator<Item = Position> + '_ {
         self.iter_all_positions().filter(|pos| pos.is_valid())
     }
 
+    pub fn iter_control_positions(&self) -> impl Iterator<Item = Position> + '_ {
+        self.iter_all_positions().filter(|pos| !pos.is_valid())
+    }
+
     pub fn iter_cells(&self) -> impl Iterator<Item = (Position, Entity)> + '_ {
-        self.iter_valid_positions()
+        self.iter_cell_positions()
             .filter_map(move |pos| self.cells_by_pos.get(&pos).map(|&entity| (pos, entity)))
     }
 
@@ -192,4 +222,14 @@ impl ReactorCore {
             .copied()
             .or_else(|| self.edges.get(&(to, from)).copied())
     }
+}
+
+#[derive(PhysicsLayer, Default)]
+pub enum GameLayer {
+    #[default]
+    Default,
+    Particle,
+    Neutron,
+    ControlRod,
+    Fuel,
 }

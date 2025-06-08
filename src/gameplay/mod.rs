@@ -1,16 +1,25 @@
 use std::f32::consts::PI;
 
-use bevy::{color::palettes::css::WHITE, prelude::*, sprite::AlphaMode2d};
+use avian2d::prelude::{Collider, CollisionLayers, RigidBody};
+use bevy::{
+    color::palettes::css::WHITE,
+    prelude::*,
+    sprite::{AlphaMode2d, Anchor},
+};
 
-use crate::{PausableSystems, asset_tracking::LoadResource, screens::Screen};
+use crate::{
+    PausableSystems, asset_tracking::LoadResource, screens::Screen, theme::interaction::UseBoldFont,
+};
 
 pub mod constants;
+pub mod control_rods;
 pub mod crt;
 pub mod neutrons;
 pub mod particles;
 pub mod schedule;
 pub mod simulation;
 pub mod types;
+pub mod ui;
 
 pub use constants::*;
 pub use crt::*;
@@ -26,10 +35,13 @@ pub fn plugin(app: &mut App) {
     app.add_plugins(particles::plugin);
     app.add_plugins(types::plugin);
     app.add_plugins(neutrons::plugin);
+    app.add_plugins(control_rods::plugin);
+    app.add_plugins(ui::plugin);
     app.add_plugins(CrtPlugin);
 
     app.init_resource::<GameplayAssets>();
     app.load_resource::<GameplayAssets>();
+
     app.add_systems(OnEnter(Screen::Gameplay), spawn_reactor);
     app.add_systems(
         Update,
@@ -59,6 +71,7 @@ pub fn plugin(app: &mut App) {
         .add_observer(on_add_particle)
         .add_observer(on_add_neutron);
 
+    app.add_event::<Cleanup>();
     app.add_systems(PostUpdate, cleanup_entities);
 }
 
@@ -96,22 +109,8 @@ fn spawn_reactor(mut commands: Commands) {
         Name::new("Reactor Core"),
         ReactorCore::default(),
         Visibility::default(),
-        Transform::from_xyz(0., 0., 0.),
+        Transform::from_xyz(50., 0., 0.),
         StateScoped(Screen::Gameplay),
-    ));
-    commands.spawn((
-        Name::new("Water container"),
-        WaterContainer,
-        ParticleContainer::default(),
-        ContainerSize(Rect::new(-50., -50., 50., 50.)),
-        Transform::from_xyz(-400., -100., 0.),
-    ));
-    commands.spawn((
-        Name::new("Steam container"),
-        SteamContainer,
-        ParticleContainer::default(),
-        ContainerSize(Rect::new(-50., -50., 50., 50.)),
-        Transform::from_xyz(-400., 100., 0.),
     ));
 }
 
@@ -127,11 +126,25 @@ fn on_add_reactor_core(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     let outer_size = CELL_OUTER_SIZE;
-    let mesh = meshes.add(Circle::new(CELL_RADIUS));
+    let cell_mesh = meshes.add(Circle::new(CELL_RADIUS));
+    //let rod_mesh = meshes.add(Circle::new(CONTROL_ROD_RADIUS));
+    let rod_mesh = meshes.add(Rectangle::from_length(CONTROL_ROD_RADIUS * 2.));
+    let indicator_size = CONTROL_ROD_RADIUS / 2.;
+    let movement_indicator_mesh = meshes.add(Triangle2d::new(
+        Vec2::Y * indicator_size,
+        Vec2::new(-indicator_size, -indicator_size),
+        Vec2::new(indicator_size, -indicator_size),
+    ));
+    let movement_indicator_material = materials.add(ColorMaterial {
+        //color: Color::srgba(1.0, 1.0, 1.0, 0.5),
+        color: Color::srgba(0.0, 0.0, 0.0, 0.2),
+        alpha_mode: AlphaMode2d::Blend,
+        ..default()
+    });
     let button_mesh = meshes.add(Rectangle::from_size(Vec2::splat(CELL_RADIUS / 2.0)));
 
     let mut cells = Vec::new();
-    for (index, pos) in core.iter_valid_positions().enumerate() {
+    for (index, pos) in core.iter_cell_positions().enumerate() {
         let entity = commands
             .spawn((
                 Name::new(format!("Cell {}/{}", pos.x, pos.y)),
@@ -151,7 +164,7 @@ fn on_add_reactor_core(
             .spawn((
                 Name::new("Background"),
                 ChildOf(entity),
-                Mesh2d(mesh.clone()),
+                Mesh2d(cell_mesh.clone()),
                 MeshMaterial2d(materials.add(Color::from(CELL_COLOR))),
                 Transform::from_xyz(0.0, 0.0, 0.0),
                 Visibility::Inherited,
@@ -163,6 +176,7 @@ fn on_add_reactor_core(
             .id();
         commands
             .spawn((
+                Name::new("Add water button"),
                 ChildOf(background),
                 CellButton(entity),
                 Mesh2d(button_mesh.clone()),
@@ -173,12 +187,55 @@ fn on_add_reactor_core(
                     ..default()
                 })),
                 Pickable::default(),
-                Transform::from_xyz(0.0, -CELL_RADIUS / 3.0, 10.0),
+                Transform::from_xyz(0.0, -CELL_RADIUS / 3.0, 30.0),
             ))
             .observe(on_click_add_water)
             .observe(on_button_over)
             .observe(on_button_out);
         cells.push((pos, entity));
+    }
+
+    for pos in core.iter_control_positions() {
+        let rod = commands
+            .spawn((
+                Name::new(format!("Control rod {}/{}", pos.x, pos.y)),
+                ChildOf(trigger.target()),
+                ControlRod(pos),
+                ControlRodInsertion(1.0),
+                Mesh2d(rod_mesh.clone()),
+                MeshMaterial2d(materials.add(CONTROL_ROD_COLOR_INSERTED)),
+                Transform::from_xyz(
+                    (pos.x as f32) * outer_size,
+                    (pos.y as f32) * outer_size,
+                    8.0,
+                ),
+                Pickable::default(),
+                RigidBody::Static,
+                Collider::rectangle(CONTROL_ROD_RADIUS * 2., CONTROL_ROD_RADIUS * 2.),
+                CollisionLayers::new(GameLayer::ControlRod, GameLayer::Neutron),
+            ))
+            .id();
+        commands.spawn((
+            Name::new("Movement indicator"),
+            ChildOf(rod),
+            ControlRodMovementIndicator,
+            Mesh2d(movement_indicator_mesh.clone()),
+            MeshMaterial2d(movement_indicator_material.clone()),
+            Transform::from_xyz(0., 0., 1.),
+            Visibility::Hidden,
+            Pickable::IGNORE,
+        ));
+        commands.spawn((
+            Name::new("Insertion indicator"),
+            ChildOf(rod),
+            ControlRodInsertionIndicator,
+            Text2d::new("100%"),
+            TextFont::from_font_size(18.),
+            TextColor::WHITE,
+            UseBoldFont,
+            Transform::from_xyz(0., 0., 2.),
+            Pickable::IGNORE,
+        ));
     }
 }
 
@@ -196,7 +253,8 @@ fn on_click_add_water(
     query: Query<&CellButton>,
 ) -> Result {
     let button = query.get(trigger.target())?;
-    commands.trigger_targets(FlowWaterParticleIntoCell, button.0);
+    // TODO: change the count of particles
+    commands.trigger_targets(FlowWaterParticlesIntoCell(3), button.0);
     Ok(())
 }
 
@@ -345,6 +403,7 @@ fn update_neutron_transforms(
     }
     Ok(())
 }
+
 fn scale_movement(time: Res<Time>, mut query: Query<(&mut CurrentScale, &TargetScale)>) {
     for (mut current, target) in &mut query {
         let diff = target.0 - current.0;
@@ -379,6 +438,7 @@ fn advance_neutron_lifecycle(
         &Expiry,
         &MeshMaterial2d<ColorMaterial>,
     )>,
+    mut cleanup: EventWriter<Cleanup>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) -> Result {
     for (entity, mut neutron, expiry, material) in &mut query {
@@ -393,7 +453,7 @@ fn advance_neutron_lifecycle(
             }
             Neutron::Dying => {
                 if expiry.0.finished() {
-                    commands.entity(entity).despawn();
+                    cleanup.write(Cleanup(entity));
                 } else {
                     let material = materials
                         .get_mut(material.id())
@@ -406,8 +466,13 @@ fn advance_neutron_lifecycle(
     Ok(())
 }
 
-fn cleanup_entities(mut commands: Commands, query: Query<Entity, With<Cleanup>>) {
-    for entity in &query {
-        commands.entity(entity).despawn();
+fn cleanup_entities(mut commands: Commands, mut events: EventReader<Cleanup>, names: Query<&Name>) {
+    for event in events.read() {
+        if let Ok(name) = names.get(event.0) {
+            debug!("despawning entity {} ({})", event.0, name);
+        } else {
+            debug!("despawning unknown entity {}", event.0);
+        }
+        commands.entity(event.0).try_despawn();
     }
 }

@@ -11,28 +11,30 @@ pub fn plugin(app: &mut App) {
 
     app.add_systems(
         Update,
-        (update_target_positions, update_eased_movement).run_if(in_state(Screen::Gameplay)),
+        update_eased_movement.run_if(in_state(Screen::Gameplay)),
     );
     app.add_observer(handle_move_particle)
-        .add_observer(handle_create_water_particle)
-        .add_observer(handle_flow_water_particle_into_cell)
-        .add_observer(handle_boil_water_particle);
+        .add_observer(handle_create_water_particles)
+        .add_observer(handle_flow_water_particles_into_cell)
+        .add_observer(handle_boil_water_particle)
+        .add_observer(handle_finished_particle_motion);
 }
 
 #[derive(Component, Copy, Clone, Reflect, Debug)]
 #[reflect(Component)]
-#[require(ParticleContainer)]
 pub struct WaterContainer;
 
 #[derive(Component, Copy, Clone, Reflect, Debug)]
 #[reflect(Component)]
-#[require(ParticleContainer)]
 pub struct SteamContainer;
 
-#[derive(Component, Clone, Reflect, Debug, Default)]
+#[derive(Component, Clone, Reflect, Debug)]
 #[reflect(Component)]
 #[require(Transform, Visibility, ContainerSize)]
-pub struct ParticleContainer(pub Vec<Entity>);
+pub struct ParticleContainer {
+    pub particle: Particle,
+    pub count: usize,
+}
 
 #[derive(Component, Copy, Clone, Reflect, Default, Debug)]
 #[reflect(Component)]
@@ -47,6 +49,9 @@ pub struct EasedMotion {
     pub easing: EaseFunction,
 }
 
+#[derive(Event, Clone, Reflect, Debug)]
+pub struct FinishedEasedMotion;
+
 #[derive(Event, Clone, Reflect, Default, Debug)]
 pub struct MoveParticle {
     pub to: Vec2,
@@ -54,10 +59,10 @@ pub struct MoveParticle {
 }
 
 #[derive(Event, Clone, Reflect, Debug)]
-pub struct CreateWaterParticle;
+pub struct CreateWaterParticles(pub usize);
 
 #[derive(Event, Clone, Reflect, Debug)]
-pub struct FlowWaterParticleIntoCell;
+pub struct FlowWaterParticlesIntoCell(pub usize);
 
 #[derive(Event, Clone, Reflect, Debug)]
 pub struct VentSteamParticleFromCell;
@@ -84,68 +89,40 @@ fn handle_move_particle(
     Ok(())
 }
 
-fn handle_create_water_particle(
-    _trigger: Trigger<CreateWaterParticle>,
-    mut commands: Commands,
-    container: Single<(Entity, &mut ParticleContainer), With<WaterContainer>>,
-) {
-    let (container_entity, mut queue) = container.into_inner();
-    let entity = commands
-        .spawn((
-            Particle::Water,
-            ChildOf(container_entity),
-            Transform::from_xyz(0.0, 0.0, 20.0),
-        ))
-        .id();
-    queue.0.insert(0, entity);
-}
-
-fn handle_flow_water_particle_into_cell(
-    trigger: Trigger<FlowWaterParticleIntoCell>,
-    mut commands: Commands,
+fn handle_create_water_particles(
+    trigger: Trigger<CreateWaterParticles>,
     container: Single<&mut ParticleContainer, With<WaterContainer>>,
-    mut cells: Query<(Entity, &GlobalTransform, &mut ParticleCount)>,
-    mut particles: Query<&GlobalTransform>,
-) -> Result {
-    let (cell, cell_transform, mut particle_count) = cells.get_mut(trigger.target())?;
-    if let Some(entity) = container.into_inner().0.pop() {
-        let particle_transform = particles.get_mut(entity)?;
-        let new_transform = particle_transform.reparented_to(cell_transform);
-
-        commands
-            .entity(entity)
-            .insert((new_transform, ChildOf(cell), TargetAngle::default()))
-            .remove::<EasedMotion>();
-        particle_count.0 += 1;
-    }
-
-    Ok(())
+) {
+    container.into_inner().count += trigger.event().0;
 }
 
-fn update_target_positions(
+fn handle_flow_water_particles_into_cell(
+    trigger: Trigger<FlowWaterParticlesIntoCell>,
     mut commands: Commands,
-    containers: Query<(&ParticleContainer, &ContainerSize), Changed<ParticleContainer>>,
+    container: Single<(&mut ParticleContainer, &GlobalTransform), With<WaterContainer>>,
+    mut cells: Query<(Entity, &GlobalTransform, &mut ParticleCount)>,
 ) -> Result {
-    for (container, size) in &containers {
-        let (width, height) = (size.0.width(), size.0.height());
-        let origin = Vec2::new(-width / 2.0, -height / 2.0);
-        let row_capacity = (width / (PARTICLE_RADIUS + CONTAINER_SPACING)).floor() as usize;
-        for (index, &entity) in container.0.iter().enumerate() {
-            let col = index % row_capacity;
-            let row = index / row_capacity;
+    let (mut container, container_transform) = container.into_inner();
+    let (cell, cell_transform, mut particle_count) = cells.get_mut(trigger.target())?;
 
-            let x = col as f32 * (PARTICLE_RADIUS * 2.0 + CONTAINER_SPACING);
-            let y = -(row as f32) * (PARTICLE_RADIUS * 2.0 + CONTAINER_SPACING);
+    let particle_transform = cell_transform.affine().inverse() * container_transform.affine();
+    let mut particle_transform = Transform::from_matrix(particle_transform.into());
+    particle_transform.translation.z = 20.0;
 
-            commands.trigger_targets(
-                MoveParticle {
-                    to: origin + Vec2::new(x, y),
-                    stop_current: false,
-                },
-                entity,
-            );
-        }
+    let count = container.count.min(trigger.event().0);
+    for _ in 0..count {
+        container.count -= 1;
+        particle_count.0 += 1;
+
+        commands.spawn((
+            Name::new("Water particle"),
+            Particle::Water,
+            particle_transform,
+            ChildOf(cell),
+            TargetAngle::default(),
+        ));
     }
+
     Ok(())
 }
 
@@ -165,6 +142,7 @@ fn update_eased_movement(
         };
 
         if motion.timer.just_finished() {
+            commands.trigger_targets(FinishedEasedMotion, entity);
             commands.entity(entity).remove::<EasedMotion>();
         }
     }
@@ -172,6 +150,7 @@ fn update_eased_movement(
 
 fn handle_boil_water_particle(
     trigger: Trigger<BoilWaterParticle>,
+    mut cleanup: EventWriter<Cleanup>,
     mut commands: Commands,
     query: Query<&ChildOf, With<Particle>>,
     mut particle_counts: Query<&mut ParticleCount>,
@@ -180,15 +159,43 @@ fn handle_boil_water_particle(
     let mut particle_count = particle_counts.get_mut(child_of.0)?;
 
     for _ in 0..STEAM_GENERATED_PER_WATER {
+        particle_count.0 += 1;
         commands
             .entity(trigger.target())
             .clone_and_spawn_with(|config| {
-                config.deny::<Particle>();
+                config.deny::<Particle>().deny::<Name>();
             })
-            .insert((Particle::Steam, Lifetime(Stopwatch::new())));
+            .insert((
+                Name::new("Steam particle"),
+                Particle::Steam,
+                Lifetime(Stopwatch::new()),
+            ));
     }
-    commands.entity(trigger.target()).insert(Cleanup);
 
-    particle_count.0 += STEAM_GENERATED_PER_WATER - 1;
+    cleanup.write(Cleanup(trigger.target()));
+    particle_count.0 -= 1;
+
     Ok(())
+}
+
+fn handle_finished_particle_motion(
+    trigger: Trigger<FinishedEasedMotion>,
+    mut commands: Commands,
+    particles: Query<(&Particle, Option<&InCell>)>,
+    steam_container: Single<&mut ParticleContainer, With<SteamContainer>>,
+    mut cleanup: EventWriter<Cleanup>,
+) {
+    if let Ok((&particle, maybe_in_cell)) = particles.get(trigger.target()) {
+        if maybe_in_cell.is_none() {
+            match particle {
+                Particle::Water => {
+                    commands.entity(trigger.target()).insert(InCell);
+                }
+                Particle::Steam => {
+                    steam_container.into_inner().count += 1;
+                    cleanup.write(Cleanup(trigger.target()));
+                }
+            }
+        }
+    }
 }

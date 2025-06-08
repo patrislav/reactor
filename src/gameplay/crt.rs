@@ -26,6 +26,27 @@ use bevy::{
 
 const SHADER_ASSET_PATH: &str = "shaders/crt.wgsl";
 
+// This is the component that will get passed to the shader
+#[derive(Component, Clone, Copy, ExtractComponent, ShaderType)]
+pub struct CrtSettings {
+    pub noise_amount: f32,
+    pub vignette_amount: f32,
+    pub aberration_amount: f32,
+    // WebGL2 structs must be 16 byte aligned.
+    _webgl2_padding: f32,
+}
+
+impl Default for CrtSettings {
+    fn default() -> Self {
+        Self {
+            noise_amount: 0.1,
+            vignette_amount: 0.75,
+            aberration_amount: 0.005,
+            _webgl2_padding: 0.0,
+        }
+    }
+}
+
 pub struct CrtPlugin;
 
 impl Plugin for CrtPlugin {
@@ -285,27 +306,6 @@ impl FromWorld for PostProcessPipeline {
             layout,
             sampler,
             pipeline_id,
-        }
-    }
-}
-
-// This is the component that will get passed to the shader
-#[derive(Component, Clone, Copy, ExtractComponent, ShaderType)]
-pub struct CrtSettings {
-    pub noise_amount: f32,
-    pub vignette_amount: f32,
-    pub aberration_amount: f32,
-    // WebGL2 structs must be 16 byte aligned.
-    _webgl2_padding: f32,
-}
-
-impl Default for CrtSettings {
-    fn default() -> Self {
-        Self {
-            noise_amount: 0.1,
-            vignette_amount: 0.75,
-            aberration_amount: 0.01,
-            _webgl2_padding: 0.0,
         }
     }
 }

@@ -32,7 +32,12 @@ pub fn plugin(app: &mut App) {
         RunSimulation,
         launch_neutrons.in_set(PhaseSystems::NeutronRelease),
     );
-    app.add_systems(RunSimulation, vent_steam.in_set(PhaseSystems::SteamVenting));
+    app.add_systems(
+        RunSimulation,
+        (vent_steam, turn_uranium_into_xenon).in_set(PhaseSystems::SteamVenting),
+    );
+
+    app.add_observer(on_launch_neutron);
 }
 
 #[derive(States, Clone, Copy, Reflect, Default, Debug, Eq, PartialEq, Hash)]
@@ -68,30 +73,61 @@ fn create_water(mut commands: Commands) {
     commands.trigger(CreateWaterParticles(WATER_CREATED_PER_TICK));
 }
 
-fn launch_neutrons(
-    mut commands: Commands,
-    cells: Query<(Entity, &GlobalTransform, &Reactivity), With<Cell>>,
-) {
-    let mut rng = rand::rng();
-    for (entity, transform, reactivity) in &cells {
-        // TODO: more than one neutron should be launched
-        let cell = transform.translation();
-        if reactivity.0 > rng.random_range(0.0..1.0) {
-            let mut layer_mask = LayerMask::ALL;
-            layer_mask.remove(GameLayer::Neutron);
+#[derive(Event, Clone, Copy, Reflect)]
+pub struct LaunchNeutron {
+    pub origin: Entity,
+    pub angle: f32,
+}
 
-            commands.spawn((
-                Name::new("Neutron"),
-                Neutron::default(),
-                Expiry(Timer::from_seconds(NEUTRON_LIFETIME_SEC, TimerMode::Once)),
-                CurrentAngle(rng.random_range(0.0..TAU)),
-                Origin(entity),
-                Transform::from_xyz(cell.x, cell.y, 25.),
-                RigidBody::Kinematic,
-                Collider::circle(NEUTRON_RADIUS),
-                CollisionLayers::new(GameLayer::Neutron, layer_mask),
-                CollisionEventsEnabled,
-            ));
+fn on_launch_neutron(
+    trigger: Trigger<LaunchNeutron>,
+    mut commands: Commands,
+    transforms: Query<&GlobalTransform, With<FuelRod>>,
+) -> Result {
+    let transform = transforms.get(trigger.origin)?.translation();
+    let mut layer_mask = LayerMask::ALL;
+    layer_mask.remove(GameLayer::Neutron);
+    commands.spawn((
+        Name::new("Neutron"),
+        Neutron::default(),
+        Expiry(Timer::from_seconds(NEUTRON_LIFETIME_SEC, TimerMode::Once)),
+        CurrentAngle(trigger.angle),
+        Origin(trigger.origin),
+        Transform::from_xyz(transform.x, transform.y, 25.),
+        RigidBody::Kinematic,
+        Collider::circle(NEUTRON_RADIUS),
+        CollisionLayers::new(GameLayer::Neutron, layer_mask),
+        CollisionEventsEnabled,
+    ));
+    Ok(())
+}
+
+fn launch_neutrons(mut commands: Commands, fuel_rods: Query<(Entity, &FuelRod, &Reactivity)>) {
+    let mut rng = rand::rng();
+    for (entity, &fuel_rod, reactivity) in &fuel_rods {
+        if fuel_rod != FuelRod::Uranium {
+            continue;
+        }
+
+        // TODO: more than one neutron should be launched
+        if reactivity.0 > rng.random_range(0.0..1.0) {
+            commands.trigger(LaunchNeutron {
+                origin: entity,
+                angle: rng.random_range(0.0..TAU),
+            });
+        }
+    }
+}
+
+fn turn_uranium_into_xenon(mut commands: Commands, fuel_rods: Query<(Entity, &FuelRod)>) {
+    let mut rng = rand::rng();
+    for (entity, &fuel_rod) in &fuel_rods {
+        if fuel_rod == FuelRod::Xenon {
+            continue;
+        }
+
+        if rng.random_range(0.0..1.0) < XENON_SPAWN_CHANCE_PER_TICK {
+            commands.entity(entity).insert(FuelRod::Xenon);
         }
     }
 }

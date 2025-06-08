@@ -14,6 +14,7 @@ use crate::{
 pub mod constants;
 pub mod control_rods;
 pub mod crt;
+pub mod fuel;
 pub mod neutrons;
 pub mod particles;
 pub mod schedule;
@@ -23,6 +24,7 @@ pub mod ui;
 
 pub use constants::*;
 pub use crt::*;
+pub use fuel::*;
 pub use neutrons::*;
 pub use particles::*;
 pub use schedule::*;
@@ -37,6 +39,7 @@ pub fn plugin(app: &mut App) {
     app.add_plugins(neutrons::plugin);
     app.add_plugins(control_rods::plugin);
     app.add_plugins(ui::plugin);
+    app.add_plugins(fuel::plugin);
     app.add_plugins(CrtPlugin);
 
     app.init_resource::<GameplayAssets>();
@@ -127,6 +130,7 @@ fn on_add_reactor_core(
 ) {
     let outer_size = CELL_OUTER_SIZE;
     let cell_mesh = meshes.add(Circle::new(CELL_RADIUS));
+    let fuel_mesh = meshes.add(Circle::new(FUEL_ROD_RADIUS));
     //let rod_mesh = meshes.add(Circle::new(CONTROL_ROD_RADIUS));
     let rod_mesh = meshes.add(Rectangle::from_length(CONTROL_ROD_RADIUS * 2.));
     let indicator_size = CONTROL_ROD_RADIUS / 2.;
@@ -151,7 +155,6 @@ fn on_add_reactor_core(
                 ChildOf(trigger.target()),
                 Cell(pos),
                 CellIndex(index),
-                Reactivity(0.5),
                 Transform::from_xyz(
                     (pos.x as f32) * outer_size,
                     (pos.y as f32) * outer_size,
@@ -160,38 +163,33 @@ fn on_add_reactor_core(
                 Visibility::Inherited,
             ))
             .id();
-        let background = commands
+        commands.spawn((
+            Name::new("Fuel rod"),
+            ChildOf(entity),
+            Reactivity(0.5),
+            FuelRod::random(INITIAL_URANIUM_TO_XENON_RATIO),
+            Mesh2d(fuel_mesh.clone()),
+            Pickable::IGNORE,
+            Transform::from_xyz(0.0, 0.0, 20.0),
+            RigidBody::Static,
+            Collider::circle(FUEL_ROD_RADIUS),
+            CollisionLayers::new(GameLayer::FuelRod, GameLayer::Neutron),
+        ));
+        commands
             .spawn((
                 Name::new("Background"),
                 ChildOf(entity),
+                CellButton(entity),
                 Mesh2d(cell_mesh.clone()),
                 MeshMaterial2d(materials.add(Color::from(CELL_COLOR))),
-                Transform::from_xyz(0.0, 0.0, 0.0),
+                Transform::from_xyz(0.0, 0.0, 1.0),
                 Visibility::Inherited,
                 Pickable::default(),
                 CurrentScale::default(),
             ))
             .observe(on_cell_pointer_over)
             .observe(on_cell_pointer_out)
-            .id();
-        commands
-            .spawn((
-                Name::new("Add water button"),
-                ChildOf(background),
-                CellButton(entity),
-                Mesh2d(button_mesh.clone()),
-                MeshMaterial2d(materials.add(ColorMaterial {
-                    color: WHITE.with_alpha(0.5).into(),
-                    alpha_mode: AlphaMode2d::Blend,
-                    texture: Some(assets.add_water.clone()),
-                    ..default()
-                })),
-                Pickable::default(),
-                Transform::from_xyz(0.0, -CELL_RADIUS / 3.0, 30.0),
-            ))
-            .observe(on_click_add_water)
-            .observe(on_button_over)
-            .observe(on_button_out);
+            .observe(on_click_add_water);
         cells.push((pos, entity));
     }
 
@@ -392,7 +390,7 @@ fn update_particle_transforms(
 
 fn update_neutron_transforms(
     mut query: Query<(&mut Transform, &Origin, &CurrentAngle, &CurrentDistance), With<Neutron>>,
-    origins: Query<&GlobalTransform, With<Cell>>,
+    origins: Query<&GlobalTransform, With<FuelRod>>,
 ) -> Result {
     for (mut transform, origin, angle, distance) in &mut query {
         let origin = origins.get(origin.0)?.translation();

@@ -22,29 +22,46 @@ pub struct BoilWaterParticle;
 fn handle_neutron_collisions(
     mut events: EventReader<CollisionStarted>,
     mut commands: Commands,
-    neutrons: Query<(), With<Neutron>>,
+    neutrons: Query<(&CurrentAngle, &Origin), With<Neutron>>,
     control_rods: Query<&ControlRodInsertion, With<ControlRod>>,
+    fuel_rods: Query<&FuelRod>,
     mut cleanup: EventWriter<Cleanup>,
 ) {
     for CollisionStarted(entity1, entity2) in events.read() {
-        let (neutron, neutron_entity, other_entity) = if let Ok(neutron) = neutrons.get(*entity1) {
-            (neutron, *entity1, *entity2)
-        } else if let Ok(neutron) = neutrons.get(*entity2) {
-            (neutron, *entity2, *entity1)
-        } else {
-            continue;
-        };
+        let ((neutron_angle, neutron_origin), neutron_entity, other_entity) =
+            if let Ok(neutron) = neutrons.get(*entity1) {
+                (neutron, *entity1, *entity2)
+            } else if let Ok(neutron) = neutrons.get(*entity2) {
+                (neutron, *entity2, *entity1)
+            } else {
+                continue;
+            };
 
         if let Ok(insertion) = control_rods.get(other_entity) {
             let mut rng = rand::rng();
             let chance = rng.random_range(0.0..1.0);
-            info!(
-                "neutron {neutron_entity} collided with rod {other_entity} with absorption {}/{}",
-                chance, insertion.0
-            );
             if chance < insertion.0 {
-                info!("absorbed!");
                 cleanup.write(Cleanup(neutron_entity));
+            }
+        } else if let Ok(fuel_rod) = fuel_rods.get(other_entity) {
+            if neutron_origin.0 == other_entity {
+                continue;
+            }
+            match fuel_rod {
+                FuelRod::Uranium => {
+                    let angles = [-0.2 * PI, 0.0, 0.2 * PI];
+                    for angle in angles {
+                        commands.trigger(LaunchNeutron {
+                            origin: other_entity,
+                            angle: neutron_angle.0 + angle,
+                        });
+                    }
+                    cleanup.write(Cleanup(neutron_entity));
+                }
+                FuelRod::Xenon => {
+                    commands.entity(other_entity).insert(FuelRod::Uranium);
+                    cleanup.write(Cleanup(neutron_entity));
+                }
             }
         }
     }

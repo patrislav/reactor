@@ -1,5 +1,6 @@
 use avian2d::prelude::PhysicsLayer;
 use bevy::{platform::collections::HashMap, prelude::*, time::Stopwatch};
+use rand::Rng;
 
 use super::*;
 
@@ -118,6 +119,24 @@ impl ControlRodMovement {
     }
 }
 
+#[derive(Component, Clone, Copy, Reflect, Eq, PartialEq)]
+#[reflect(Component)]
+pub enum FuelRod {
+    Uranium,
+    Xenon,
+}
+
+impl FuelRod {
+    pub fn random(uranium_chance: f32) -> Self {
+        let mut rng = rand::rng();
+        if rng.random_range(0.0..1.0) < uranium_chance {
+            Self::Uranium
+        } else {
+            Self::Xenon
+        }
+    }
+}
+
 #[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
 pub struct ControlRodMovementIndicator;
@@ -231,5 +250,5 @@ pub enum GameLayer {
     Particle,
     Neutron,
     ControlRod,
-    Fuel,
+    FuelRod,
 }

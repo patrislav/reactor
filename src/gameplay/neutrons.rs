@@ -73,18 +73,23 @@ fn handle_neutron_collisions(
 fn check_neutron_collisions_with_particles(
     mut commands: Commands,
     neutrons: Query<(Entity, &GlobalTransform), (With<Neutron>, Without<Particle>)>,
-    particles: Query<
-        (Entity, &Particle, &GlobalTransform, Option<&EasedMotion>),
+    mut particles: Query<
+        (
+            Entity,
+            &mut Particle,
+            &GlobalTransform,
+            Option<&EasedMotion>,
+        ),
         (Without<Neutron>, With<InCell>),
     >,
     mut cleanup: EventWriter<Cleanup>,
 ) {
     let mut hit_particles = HashSet::new();
     for (neutron, neutron_transform) in &neutrons {
-        'inner: for (particle_entity, &particle, particle_transform, maybe_eased_motion) in
-            &particles
+        'inner: for (particle_entity, mut particle, particle_transform, maybe_eased_motion) in
+            &mut particles
         {
-            if particle != Particle::Water {
+            if *particle != Particle::Water(false) {
                 continue;
             }
             if let Some(eased_motion) = maybe_eased_motion {
@@ -100,6 +105,7 @@ fn check_neutron_collisions_with_particles(
             if distance < NEUTRON_RADIUS + PARTICLE_RADIUS + COLLISION_LEEWAY
                 && !hit_particles.contains(&particle_entity)
             {
+                *particle = Particle::Water(true);
                 commands.trigger_targets(BoilWaterParticle, particle_entity);
                 cleanup.write(Cleanup(neutron));
                 hit_particles.insert(particle_entity);

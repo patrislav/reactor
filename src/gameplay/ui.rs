@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use rand::seq::SliceRandom;
+use tracing::Instrument;
 
 use crate::theme::palette::BUTTON_TEXT;
 
@@ -17,6 +19,7 @@ pub fn plugin(app: &mut App) {
     app.add_systems(
         Update,
         (
+            update_water_flow,
             update_steam_score,
             update_power_score,
             update_power_demand,
@@ -51,13 +54,17 @@ fn spawn_water_container(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    let button_mesh = meshes.add(Rectangle::from_length(26.));
+    let distribute_mesh = meshes.add(Rectangle::from_size(Vec2::new(100., 26.)));
+    let button_material = materials.add(Color::WHITE);
+
     let root = commands
         .spawn((
             Name::new("Water container"),
             StateScoped(Screen::Gameplay),
             WaterContainer,
             ParticleContainer {
-                particle: Particle::Water,
+                particle: Particle::Water(false),
                 count: 10,
             },
             ParticleContainerColor(Color::from(WATER_COLOR)),
@@ -98,8 +105,9 @@ fn spawn_water_container(
 
     commands.spawn((
         Name::new("Water per action"),
-        WaterPerActionMarker,
         ChildOf(control),
+        WaterPerActionMarker,
+        Transform::from_xyz(0., 25., 1.),
         Anchor::Center,
         Text2d::new("3"),
         TextFont {
@@ -108,6 +116,72 @@ fn spawn_water_container(
         },
         TextColor(BUTTON_TEXT),
     ));
+    commands
+        .spawn((
+            Name::new("Minus"),
+            ChildOf(control),
+            Mesh2d(button_mesh.clone()),
+            MeshMaterial2d(button_material.clone()),
+            Transform::from_xyz(-50., 25., 1.),
+            Pickable::default(),
+            children![(
+                Name::new("Minus label"),
+                Text2d::new("<"),
+                TextFont {
+                    font_size: 34.,
+                    ..default()
+                },
+                UseBoldFont,
+                TextColor(WATER_COLOR.into()),
+                Transform::from_xyz(0., 2., 1.),
+                Pickable::IGNORE,
+            )],
+        ))
+        .observe(on_click_water_control_decrease);
+    commands
+        .spawn((
+            Name::new("Plus"),
+            ChildOf(control),
+            Mesh2d(button_mesh.clone()),
+            MeshMaterial2d(button_material.clone()),
+            Transform::from_xyz(50., 25., 1.),
+            Pickable::default(),
+            children![(
+                Name::new("Plus label"),
+                Text2d::new(">"),
+                TextFont {
+                    font_size: 34.,
+                    ..default()
+                },
+                UseBoldFont,
+                TextColor(WATER_COLOR.into()),
+                Transform::from_xyz(0., 2., 1.),
+                Pickable::IGNORE,
+            )],
+        ))
+        .observe(on_click_water_control_increase);
+    commands
+        .spawn((
+            Name::new("Distribute"),
+            ChildOf(control),
+            Mesh2d(distribute_mesh.clone()),
+            MeshMaterial2d(button_material.clone()),
+            Transform::from_xyz(0., -25., 1.),
+            Pickable::default(),
+            children![(
+                Name::new("Distribute label"),
+                Text2d::new("distribute"),
+                TextFont {
+                    font_size: 18.,
+                    ..default()
+                },
+                UseBoldFont,
+                TextColor(BUTTON_TEXT),
+                Transform::from_xyz(0., 0., 1.),
+                Pickable::IGNORE,
+            )],
+        ))
+        .observe(on_click_water_distribute);
 }
 
 fn spawn_steam_container(
@@ -205,7 +279,7 @@ fn spawn_power_container(
         MeshMaterial2d(materials.add(ColorMaterial::from_color(URANIUM_COLOR))),
         children![
             (
-                Name::new("Power score help text"),
+                Name::new("Power score label"),
                 Anchor::TopLeft,
                 Transform::from_xyz(-96., 46., 0.0),
                 Text2d::new("generated:"),
@@ -230,7 +304,7 @@ fn spawn_power_container(
                 TextColor(BUTTON_TEXT),
             ),
             (
-                Name::new("Power demand help text"),
+                Name::new("Power demand label"),
                 Anchor::BottomLeft,
                 Transform::from_xyz(-96., -46., 0.0),
                 Text2d::new("demand:"),
@@ -256,6 +330,13 @@ fn spawn_power_container(
             )
         ],
     ));
+}
+
+fn update_water_flow(
+    mut text: Single<&mut Text2d, With<WaterPerActionMarker>>,
+    flow: Single<&WaterFlow, With<WaterContainer>>,
+) {
+    text.0 = format!("{}", flow.get());
 }
 
 fn update_steam_score(
@@ -307,5 +388,27 @@ fn update_colors(
                 }
             }
         }
+    }
+}
+
+fn on_click_water_control_decrease(_: Trigger<Pointer<Click>>, query: Single<&mut WaterFlow>) {
+    query.into_inner().decrease();
+}
+
+fn on_click_water_control_increase(_: Trigger<Pointer<Click>>, query: Single<&mut WaterFlow>) {
+    query.into_inner().increase();
+}
+
+fn on_click_water_distribute(
+    _: Trigger<Pointer<Click>>,
+    mut commands: Commands,
+    query: Query<Entity, With<Cell>>,
+) {
+    let mut rng = rand::rng();
+    let mut cells: Vec<_> = query.into_iter().collect();
+    cells.shuffle(&mut rng);
+
+    for cell in cells {
+        commands.trigger_targets(FlowWaterParticlesIntoCell, cell);
     }
 }

@@ -7,7 +7,8 @@ use bevy::{
 };
 
 use crate::{
-    PausableSystems, asset_tracking::LoadResource, screens::Screen, theme::interaction::UseBoldFont,
+    AppSystems, PausableSystems, asset_tracking::LoadResource, screens::Screen,
+    theme::interaction::UseBoldFont,
 };
 
 pub mod constants;
@@ -249,8 +250,7 @@ fn on_click_add_water(
     query: Query<&CellButton>,
 ) -> Result {
     let button = query.get(trigger.target())?;
-    // TODO: change the count of particles
-    commands.trigger_targets(FlowWaterParticlesIntoCell(3), button.0);
+    commands.trigger_targets(FlowWaterParticlesIntoCell, button.0);
     Ok(())
 }
 
@@ -296,12 +296,14 @@ fn on_add_neutron(
 fn update_particle_target_angles(
     mut commands: Commands,
     cells: Query<&Children, (With<Cell>, Changed<ParticleCount>)>,
-    particles: Query<(Entity, &TargetAngle), With<Particle>>,
+    particles: Query<(Entity, &Particle, &TargetAngle)>,
 ) {
     for children in &cells {
         let mut particles: Vec<_> = children
             .iter()
             .flat_map(|entity| particles.get(entity))
+            .filter(|(_, p, _)| **p != Particle::Water(true))
+            .map(|(a, _, b)| (a, b))
             .collect();
 
         particles

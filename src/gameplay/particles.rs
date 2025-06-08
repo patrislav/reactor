@@ -11,7 +11,7 @@ pub fn plugin(app: &mut App) {
 
     app.add_systems(
         Update,
-        update_eased_movement.run_if(in_state(Screen::Gameplay)),
+        (update_eased_movement, update_cell_colors).run_if(in_state(Screen::Gameplay)),
     );
     app.add_observer(handle_move_particle)
         .add_observer(handle_create_water_particles)
@@ -21,8 +21,37 @@ pub fn plugin(app: &mut App) {
 }
 
 #[derive(Component, Copy, Clone, Reflect, Debug)]
+#[require(WaterFlow)]
 #[reflect(Component)]
 pub struct WaterContainer;
+
+#[derive(Component, Copy, Clone, Reflect, Debug)]
+#[reflect(Component)]
+pub struct WaterFlow(usize);
+
+impl WaterFlow {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+
+    pub fn decrease(&mut self) {
+        if self.0 > 1 {
+            self.0 -= 1;
+        }
+    }
+
+    pub fn increase(&mut self) {
+        if self.0 < 50 {
+            self.0 += 1;
+        }
+    }
+}
+
+impl Default for WaterFlow {
+    fn default() -> Self {
+        Self(3)
+    }
+}
 
 #[derive(Component, Copy, Clone, Reflect, Debug)]
 #[reflect(Component)]
@@ -67,7 +96,7 @@ pub struct MoveParticle {
 pub struct CreateWaterParticles(pub usize);
 
 #[derive(Event, Clone, Reflect, Debug)]
-pub struct FlowWaterParticlesIntoCell(pub usize);
+pub struct FlowWaterParticlesIntoCell;
 
 #[derive(Event, Clone, Reflect, Debug)]
 pub struct VentSteamParticleFromCell;
@@ -104,24 +133,24 @@ fn handle_create_water_particles(
 fn handle_flow_water_particles_into_cell(
     trigger: Trigger<FlowWaterParticlesIntoCell>,
     mut commands: Commands,
-    container: Single<(&mut ParticleContainer, &GlobalTransform), With<WaterContainer>>,
+    container: Single<(&mut ParticleContainer, &GlobalTransform, &WaterFlow), With<WaterContainer>>,
     mut cells: Query<(Entity, &GlobalTransform, &mut ParticleCount)>,
 ) -> Result {
-    let (mut container, container_transform) = container.into_inner();
+    let (mut container, container_transform, water_flow) = container.into_inner();
     let (cell, cell_transform, mut particle_count) = cells.get_mut(trigger.target())?;
 
     let particle_transform = cell_transform.affine().inverse() * container_transform.affine();
     let mut particle_transform = Transform::from_matrix(particle_transform.into());
     particle_transform.translation.z = 20.0;
 
-    let count = container.count.min(trigger.event().0);
+    let count = container.count.min(water_flow.0);
     for _ in 0..count {
         container.count -= 1;
-        particle_count.0 += 1;
+        particle_count.increment(1);
 
         commands.spawn((
             Name::new("Water particle"),
-            Particle::Water,
+            Particle::Water(false),
             particle_transform,
             ChildOf(cell),
             TargetAngle::default(),
@@ -164,7 +193,8 @@ fn handle_boil_water_particle(
     let mut particle_count = particle_counts.get_mut(child_of.0)?;
 
     for _ in 0..STEAM_GENERATED_PER_WATER {
-        particle_count.0 += 1;
+        particle_count.increment(1);
+
         commands
             .entity(trigger.target())
             .clone_and_spawn_with(|config| {
@@ -178,7 +208,7 @@ fn handle_boil_water_particle(
     }
 
     cleanup.write(Cleanup(trigger.target()));
-    particle_count.0 -= 1;
+    particle_count.decrement(1);
 
     Ok(())
 }
@@ -200,7 +230,7 @@ fn handle_finished_particle_motion(
     if let Ok((&particle, maybe_in_cell)) = particles.get(trigger.target()) {
         if maybe_in_cell.is_none() {
             match particle {
-                Particle::Water => {
+                Particle::Water(_) => {
                     commands.entity(trigger.target()).insert(InCell);
                 }
                 Particle::Steam => {
@@ -210,6 +240,22 @@ fn handle_finished_particle_motion(
                 Particle::Energy => {
                     energy_container.into_inner().count += 1;
                     cleanup.write(Cleanup(trigger.target()));
+                }
+            }
+        }
+    }
+}
+
+fn update_cell_colors(
+    query: Query<(&CellColor, &Children), (With<Cell>, Changed<CellColor>)>,
+    mesh_materials: Query<&MeshMaterial2d<ColorMaterial>, With<CellButton>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    for (color, children) in &query {
+        for entity in children {
+            if let Ok(mesh_material) = mesh_materials.get(*entity) {
+                if let Some(material) = materials.get_mut(mesh_material.id()) {
+                    material.color = color.0;
                 }
             }
         }

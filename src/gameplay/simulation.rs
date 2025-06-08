@@ -5,7 +5,10 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use super::*;
-use crate::PausableSystems;
+use crate::{
+    PausableSystems,
+    screens::game_over::{GameOver, GameOverCause},
+};
 
 pub fn plugin(app: &mut App) {
     app.init_state::<Phase>();
@@ -37,7 +40,13 @@ pub fn plugin(app: &mut App) {
     );
     app.add_systems(
         RunSimulation,
-        (vent_steam, turn_uranium_into_xenon).in_set(PhaseSystems::SteamVenting),
+        (vent_steam, turn_uranium_into_xenon, track_cell_pressure)
+            .in_set(PhaseSystems::SteamVenting),
+    );
+
+    app.add_systems(
+        Update,
+        handle_overpressure_timer.run_if(in_state(Screen::Gameplay)),
     );
 
     app.add_observer(on_launch_neutron);
@@ -160,9 +169,7 @@ fn vent_steam(
 
         let vented_particles = particles.into_iter().take(STEAM_VENTED_PER_TICK);
         for (entity, particle_transform, _) in vented_particles {
-            if particle_count.0 > 0 {
-                particle_count.0 -= 1;
-            }
+            particle_count.decrement(1);
 
             let new_transform = particle_transform.reparented_to(container_transform);
             commands
@@ -181,4 +188,54 @@ fn vent_steam(
             );
         }
     }
+}
+
+#[derive(Component)]
+struct OverPressureTimer(Timer);
+
+fn track_cell_pressure(
+    mut commands: Commands,
+    query: Query<(Entity, &ParticleCount), With<Cell>>,
+    energy_container: Single<&ParticleContainer, With<EnergyContainer>>,
+) {
+    for (entity, particle_count) in &query {
+        if particle_count.get() > PRESSURE_EXPLOSION_LEVEL {
+            commands.trigger(GameOver {
+                cause: GameOverCause::Explosion,
+                power_generated: energy_container.count,
+            });
+        } else if particle_count.get() > PRESSURE_WARN_LEVEL {
+            commands
+                .entity(entity)
+                .insert(OverPressureTimer(Timer::from_seconds(
+                    1.0,
+                    TimerMode::Repeating,
+                )));
+        } else {
+            commands
+                .entity(entity)
+                .remove::<OverPressureTimer>()
+                .insert(CellColor(Color::from(CELL_COLOR)));
+        }
+    }
+}
+
+fn handle_overpressure_timer(
+    mut commands: Commands,
+    time: Res<Time>,
+    query: Single<(Entity, &mut OverPressureTimer)>,
+) {
+    let (entity, mut timer) = query.into_inner();
+
+    timer.0.tick(time.delta());
+
+    let t = timer.0.fraction();
+    let blend = if t <= 0.5 {
+        t / 0.5 // 0.0 -> 1.0
+    } else {
+        1.0 - ((t - 0.5) / 0.5) // 1.0 -> 0.0
+    };
+    commands.entity(entity).insert(CellColor(
+        Color::from(WARNING_COLOR).mix(&CELL_COLOR.into(), blend),
+    ));
 }

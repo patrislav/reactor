@@ -17,14 +17,14 @@ fn spawn_main_menu(mut commands: Commands) {
         children![
             widget::button("play", enter_loading_or_gameplay_screen),
             widget::button("settings", open_settings_menu),
-            widget::button("credist", open_credits_menu),
+            widget::button("credits", open_credits_menu),
             widget::button("exit", exit_app),
         ],
         #[cfg(target_family = "wasm")]
         children![
             widget::button("play", enter_loading_or_gameplay_screen),
             widget::button("settings", open_settings_menu),
-            widget::button("exit", open_credits_menu),
+            widget::button("credits", open_credits_menu),
         ],
     ));
 }

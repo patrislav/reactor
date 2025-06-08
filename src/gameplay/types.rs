@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use avian2d::prelude::PhysicsLayer;
-use bevy::{platform::collections::HashMap, prelude::*, time::Stopwatch};
+use bevy::{color::palettes::css, platform::collections::HashMap, prelude::*, time::Stopwatch};
 use rand::Rng;
 
 use super::*;
@@ -20,7 +20,7 @@ pub fn plugin(app: &mut App) {
 #[derive(Component, Clone, Copy, Debug, Reflect, Eq, PartialEq)]
 #[reflect(Component)]
 pub enum Particle {
-    Water,
+    Water(bool),
     Steam,
     Energy,
 }
@@ -28,7 +28,7 @@ pub enum Particle {
 impl Particle {
     pub fn color(&self) -> Color {
         match self {
-            Particle::Water => Color::from(WATER_COLOR),
+            Particle::Water(_) => Color::from(WATER_COLOR),
             Particle::Steam => Color::from(STEAM_COLOR),
             Particle::Energy => URANIUM_COLOR,
         }
@@ -88,12 +88,40 @@ pub struct TargetDistance(pub f32);
 
 #[derive(Component, Clone, Copy, Reflect, Default)]
 #[reflect(Component)]
-pub struct ParticleCount(pub usize);
+pub struct ParticleCount(usize);
+
+impl ParticleCount {
+    pub fn get(&self) -> usize {
+        self.0
+    }
+
+    pub fn increment(&mut self, amount: usize) {
+        self.0 += amount;
+    }
+
+    pub fn decrement(&mut self, amount: usize) {
+        if amount > self.0 {
+            self.0 = 0;
+        } else {
+            self.0 -= amount;
+        }
+    }
+}
 
 #[derive(Component, Clone, Copy, Reflect)]
-#[require(ParticleCount, CurrentScale)]
+#[require(ParticleCount, CurrentScale, CellColor)]
 #[reflect(Component)]
 pub struct Cell(pub Position);
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct CellColor(pub Color);
+
+impl Default for CellColor {
+    fn default() -> Self {
+        Self(CELL_COLOR.into())
+    }
+}
 
 #[derive(Component, Clone, Copy, Reflect)]
 #[reflect(Component)]
@@ -162,18 +190,25 @@ pub struct PowerDemand(pub usize);
 
 #[derive(Component, Clone, Reflect)]
 pub struct NextPowerDemand {
-    pub demand: usize,
-    pub timer: Timer,
+    pub delta: usize,
+    pub demand_timer: Timer,
+    pub demand_rate_timer: Timer,
+    pub tutorial_timer: Timer,
 }
 
 impl Default for NextPowerDemand {
     fn default() -> Self {
         Self {
-            demand: 5,
-            timer: Timer::new(
+            delta: 1,
+            demand_timer: Timer::new(
                 Duration::from_secs_f32(INCREASE_POWER_DEMAND_SEC),
                 TimerMode::Repeating,
             ),
+            demand_rate_timer: Timer::new(
+                Duration::from_secs_f32(INCREASE_POWER_DEMAND_INCREASE_RATE_SEC),
+                TimerMode::Repeating,
+            ),
+            tutorial_timer: Timer::new(Duration::from_secs_f32(TUTORIAL_SEC), TimerMode::Once),
         }
     }
 }

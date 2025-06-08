@@ -11,21 +11,45 @@ pub fn plugin(app: &mut App) {
     );
     app.add_systems(
         Update,
-        (increase_power_demand, handle_lack_of_power_timer).run_if(in_state(Screen::Gameplay)),
+        (
+            tick_timers,
+            increase_power_demand,
+            increase_power_demand_increase_rate,
+            handle_lack_of_power_timer,
+        )
+            .chain()
+            .run_if(in_state(Screen::Gameplay)),
     );
 }
 
 #[derive(Component, Clone, Default, Reflect)]
 pub struct TicksWithoutPower(pub usize);
 
-fn increase_power_demand(time: Res<Time>, query: Single<(&mut NextPowerDemand, &mut PowerDemand)>) {
-    let (mut next, mut current) = query.into_inner();
+fn tick_timers(time: Res<Time>, mut query: Single<&mut NextPowerDemand>) {
+    query.demand_timer.tick(time.delta());
+    query.demand_rate_timer.tick(time.delta());
+    query.tutorial_timer.tick(time.delta());
+}
 
-    next.timer.tick(time.delta());
+fn increase_power_demand(query: Single<(&NextPowerDemand, &mut PowerDemand)>) {
+    let (next, mut current) = query.into_inner();
 
-    if next.timer.just_finished() {
-        current.0 = next.demand;
-        next.demand *= 2;
+    if !next.tutorial_timer.finished() {
+        return;
+    }
+
+    if next.demand_timer.just_finished() {
+        current.0 += next.delta;
+    }
+}
+
+fn increase_power_demand_increase_rate(mut next: Single<&mut NextPowerDemand>) {
+    if !next.tutorial_timer.finished() {
+        return;
+    }
+
+    if next.demand_rate_timer.just_finished() {
+        next.delta += 1;
     }
 }
 
@@ -37,6 +61,7 @@ fn turn_steam_into_power(
             &ParticleContainer,
             &GlobalTransform,
             &PowerDemand,
+            &NextPowerDemand,
             &mut TicksWithoutPower,
         ),
         (With<EnergyContainer>, Without<SteamContainer>),
@@ -46,11 +71,17 @@ fn turn_steam_into_power(
         (With<SteamContainer>, Without<EnergyContainer>),
     >,
 ) {
-    let (energy_entity, energy_container, energy_transform, demand, mut ticks_without_power) =
-        energy_container.into_inner();
+    let (
+        energy_entity,
+        energy_container,
+        energy_transform,
+        demand,
+        next_demand,
+        mut ticks_without_power,
+    ) = energy_container.into_inner();
     let (mut steam_container, steam_transform) = steam_container.into_inner();
 
-    let diff = demand.0 - energy_container.count;
+    let diff = (demand.0 + next_demand.delta) - energy_container.count;
     let count = steam_container.count.min(diff);
 
     for _ in 0..count {
@@ -96,6 +127,11 @@ fn handle_lack_of_power(
         commands
             .entity(entity)
             .insert(LackOfPowerTimer(Timer::from_seconds(1.0, TimerMode::Once)));
+    } else {
+        commands
+            .entity(entity)
+            .remove::<LackOfPowerTimer>()
+            .insert(ParticleContainerColor(URANIUM_COLOR));
     }
 }
 
@@ -112,16 +148,12 @@ fn handle_lack_of_power_timer(
     timer.0.tick(time.delta());
 
     let t = timer.0.fraction();
-    let blend = if t <= 0.25 {
-        t / 0.25 // 0.0 -> 1.0
+    let blend = if t <= 0.5 {
+        t / 0.5 // 0.0 -> 1.0
     } else {
-        1.0 - ((t - 0.25) / 0.75) // 1.0 -> 0.0
+        1.0 - ((t - 0.5) / 0.5) // 1.0 -> 0.0
     };
     commands.entity(entity).insert(ParticleContainerColor(
         Color::from(WARNING_COLOR).mix(&URANIUM_COLOR, blend),
     ));
-
-    if timer.0.just_finished() {
-        commands.entity(entity).remove::<LackOfPowerTimer>();
-    }
 }

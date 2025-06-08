@@ -2,7 +2,6 @@ use std::f32::consts::PI;
 
 use avian2d::prelude::{Collider, CollisionLayers, RigidBody};
 use bevy::{
-    color::palettes::css::WHITE,
     prelude::*,
     sprite::{AlphaMode2d, Anchor},
 };
@@ -24,7 +23,7 @@ pub mod ui;
 
 pub use constants::*;
 pub use crt::*;
-pub use fuel::*;
+//pub use fuel::*;
 pub use neutrons::*;
 pub use particles::*;
 pub use schedule::*;
@@ -123,7 +122,7 @@ struct CellButton(Entity);
 fn on_add_reactor_core(
     trigger: Trigger<OnAdd, ReactorCore>,
     core: Single<&ReactorCore>,
-    assets: Res<GameplayAssets>,
+    _assets: Res<GameplayAssets>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -131,7 +130,6 @@ fn on_add_reactor_core(
     let outer_size = CELL_OUTER_SIZE;
     let cell_mesh = meshes.add(Circle::new(CELL_RADIUS));
     let fuel_mesh = meshes.add(Circle::new(FUEL_ROD_RADIUS));
-    //let rod_mesh = meshes.add(Circle::new(CONTROL_ROD_RADIUS));
     let rod_mesh = meshes.add(Rectangle::from_length(CONTROL_ROD_RADIUS * 2.));
     let indicator_size = CONTROL_ROD_RADIUS / 2.;
     let movement_indicator_mesh = meshes.add(Triangle2d::new(
@@ -140,12 +138,10 @@ fn on_add_reactor_core(
         Vec2::new(indicator_size, -indicator_size),
     ));
     let movement_indicator_material = materials.add(ColorMaterial {
-        //color: Color::srgba(1.0, 1.0, 1.0, 0.5),
         color: Color::srgba(0.0, 0.0, 0.0, 0.2),
         alpha_mode: AlphaMode2d::Blend,
         ..default()
     });
-    let button_mesh = meshes.add(Rectangle::from_size(Vec2::splat(CELL_RADIUS / 2.0)));
 
     let mut cells = Vec::new();
     for (index, pos) in core.iter_cell_positions().enumerate() {
@@ -253,34 +249,6 @@ fn on_click_add_water(
     let button = query.get(trigger.target())?;
     // TODO: change the count of particles
     commands.trigger_targets(FlowWaterParticlesIntoCell(3), button.0);
-    Ok(())
-}
-
-fn on_button_over(
-    trigger: Trigger<Pointer<Over>>,
-    query: Query<&MeshMaterial2d<ColorMaterial>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) -> Result {
-    let material = query.get(trigger.target())?;
-    materials
-        .get_mut(material.id())
-        .ok_or_else(|| anyhow::format_err!("No material"))?
-        .color
-        .set_alpha(1.0);
-    Ok(())
-}
-
-fn on_button_out(
-    trigger: Trigger<Pointer<Out>>,
-    query: Query<&MeshMaterial2d<ColorMaterial>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) -> Result {
-    let material = query.get(trigger.target())?;
-    materials
-        .get_mut(material.id())
-        .ok_or_else(|| anyhow::format_err!("No material"))?
-        .color
-        .set_alpha(0.5);
     Ok(())
 }
 

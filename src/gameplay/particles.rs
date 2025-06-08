@@ -96,9 +96,9 @@ fn handle_move_particle(
 
 fn handle_create_water_particles(
     trigger: Trigger<CreateWaterParticles>,
-    container: Single<&mut ParticleContainer, With<WaterContainer>>,
+    mut container: Single<&mut ParticleContainer, With<WaterContainer>>,
 ) {
-    container.into_inner().count += trigger.event().0;
+    container.count = (container.count + trigger.event().0).clamp(0, MAX_WATER_STORED);
 }
 
 fn handle_flow_water_particles_into_cell(

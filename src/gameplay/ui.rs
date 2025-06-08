@@ -269,17 +269,17 @@ fn update_power_score(
     mut text: Single<&mut Text2d, With<TotalEnergyMarker>>,
     container: Single<&ParticleContainer, With<EnergyContainer>>,
 ) {
-    text.0 = format_power(container.count);
+    text.0 = format_power(container.count as u64); // TODO: change the container.count type
 }
 
 fn update_power_demand(
     mut text: Single<&mut Text2d, With<PowerDemandMarker>>,
     demand: Single<&PowerDemand, With<EnergyContainer>>,
 ) {
-    text.0 = format_power(demand.0);
+    text.0 = format_power(demand.0 as u64); // TODO: change the demand.0 type
 }
 
-fn format_power(power: usize) -> String {
+fn format_power(power: u64) -> String {
     if power > 10_000_000_000 {
         format!("{} B", power / 1_000_000_000)
     } else if power > 10_000_000 {

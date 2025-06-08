@@ -24,7 +24,8 @@ pub const SCALE_SPEED: f32 = 10.; // per sec
 
 pub const MAX_NEUTRONS_RELEASED_PER_TICK: usize = 3;
 pub const NEUTRON_SPAWN_CHANCE: f32 = 0.6;
-pub const WATER_CREATED_PER_TICK: usize = 30; // TODO: make it normal
+pub const WATER_CREATED_PER_TICK: usize = 50;
+pub const MAX_WATER_STORED: usize = 200;
 pub const STEAM_GENERATED_PER_WATER: usize = 2;
 pub const STEAM_VENTED_PER_TICK: usize = 3;
 pub const XENON_SPAWN_CHANCE_PER_TICK: f32 = 0.1;

@@ -2,7 +2,12 @@
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use crate::{menus::Menu, screens::Screen, theme::widget};
+use crate::{
+    gameplay::{EnergyContainer, ParticleContainer},
+    menus::Menu,
+    screens::game_over::{GameOver, GameOverCause},
+    theme::widget,
+};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(Menu::Pause), spawn_pause_menu);
@@ -34,8 +39,19 @@ fn close_menu(_: Trigger<Pointer<Click>>, mut next_menu: ResMut<NextState<Menu>>
     next_menu.set(Menu::None);
 }
 
-fn quit_to_title(_: Trigger<Pointer<Click>>, mut next_screen: ResMut<NextState<Screen>>) {
-    next_screen.set(Screen::Title);
+fn quit_to_title(
+    _: Trigger<Pointer<Click>>,
+    mut commands: Commands,
+    query: Query<&ParticleContainer, With<EnergyContainer>>,
+) {
+    let mut power_generated = 0;
+    for container in &query {
+        power_generated += container.count;
+    }
+    commands.trigger(GameOver {
+        cause: GameOverCause::PlayerAbandoned,
+        power_generated,
+    });
 }
 
 fn go_back(mut next_menu: ResMut<NextState<Menu>>) {

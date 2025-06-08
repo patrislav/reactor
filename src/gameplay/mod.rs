@@ -16,6 +16,7 @@ pub mod crt;
 pub mod fuel;
 pub mod neutrons;
 pub mod particles;
+pub mod power;
 pub mod schedule;
 pub mod simulation;
 pub mod types;
@@ -26,6 +27,7 @@ pub use crt::*;
 //pub use fuel::*;
 pub use neutrons::*;
 pub use particles::*;
+pub use power::*;
 pub use schedule::*;
 pub use simulation::*;
 pub use types::*;
@@ -40,6 +42,7 @@ pub fn plugin(app: &mut App) {
     app.add_plugins(ui::plugin);
     app.add_plugins(fuel::plugin);
     app.add_plugins(CrtPlugin);
+    app.add_plugins(power::plugin);
 
     app.init_resource::<GameplayAssets>();
     app.load_resource::<GameplayAssets>();
@@ -81,20 +84,19 @@ pub fn plugin(app: &mut App) {
 #[reflect(Resource)]
 pub struct GameplayAssets {
     particle: Handle<Mesh>,
-
     //#[dependency]
     //music: Handle<AudioSource>,
-    #[dependency]
-    add_water: Handle<Image>,
+    //#[dependency]
+    //add_water: Handle<Image>,
 }
 
 impl FromWorld for GameplayAssets {
     fn from_world(world: &mut World) -> Self {
         world.resource_scope(|world, mut meshes: Mut<Assets<Mesh>>| {
-            let assets = world.resource::<AssetServer>();
+            let _assets = world.resource::<AssetServer>();
             Self {
                 particle: meshes.add(Circle::new(PARTICLE_RADIUS)),
-                add_water: assets.load("images/add-water.png"),
+                //add_water: assets.load("images/add-water.png"),
             }
         })
     }
@@ -111,7 +113,7 @@ fn spawn_reactor(mut commands: Commands) {
         Name::new("Reactor Core"),
         ReactorCore::default(),
         Visibility::default(),
-        Transform::from_xyz(50., 0., 0.),
+        Transform::from_xyz(0., 0., 0.),
         StateScoped(Screen::Gameplay),
     ));
 }

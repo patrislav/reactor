@@ -28,6 +28,11 @@ pub struct WaterContainer;
 #[reflect(Component)]
 pub struct SteamContainer;
 
+#[derive(Component, Copy, Clone, Reflect, Debug)]
+#[reflect(Component)]
+#[require(PowerDemand, NextPowerDemand)]
+pub struct EnergyContainer;
+
 #[derive(Component, Clone, Reflect, Debug)]
 #[reflect(Component)]
 #[require(Transform, Visibility, ContainerSize)]
@@ -182,7 +187,14 @@ fn handle_finished_particle_motion(
     trigger: Trigger<FinishedEasedMotion>,
     mut commands: Commands,
     particles: Query<(&Particle, Option<&InCell>)>,
-    steam_container: Single<&mut ParticleContainer, With<SteamContainer>>,
+    steam_container: Single<
+        &mut ParticleContainer,
+        (With<SteamContainer>, Without<EnergyContainer>),
+    >,
+    energy_container: Single<
+        &mut ParticleContainer,
+        (With<EnergyContainer>, Without<SteamContainer>),
+    >,
     mut cleanup: EventWriter<Cleanup>,
 ) {
     if let Ok((&particle, maybe_in_cell)) = particles.get(trigger.target()) {
@@ -193,6 +205,10 @@ fn handle_finished_particle_motion(
                 }
                 Particle::Steam => {
                     steam_container.into_inner().count += 1;
+                    cleanup.write(Cleanup(trigger.target()));
+                }
+                Particle::Energy => {
+                    energy_container.into_inner().count += 1;
                     cleanup.write(Cleanup(trigger.target()));
                 }
             }

@@ -9,7 +9,10 @@ use super::*;
 pub fn plugin(app: &mut App) {
     app.add_systems(
         FixedUpdate,
-        check_neutron_collisions_with_particles
+        (
+            check_neutron_collisions_with_particles,
+            check_neutron_out_of_bounds,
+        )
             .run_if(in_state(Screen::Gameplay))
             .in_set(PausableSystems),
     );
@@ -102,6 +105,27 @@ fn check_neutron_collisions_with_particles(
                 hit_particles.insert(particle_entity);
                 break 'inner;
             }
+        }
+    }
+}
+
+fn check_neutron_out_of_bounds(
+    mut commands: Commands,
+    query: Query<(Entity, &Neutron, &GlobalTransform), With<Neutron>>,
+) {
+    for (entity, neutron, transform) in &query {
+        if *neutron == Neutron::Dying {
+            continue;
+        }
+
+        let w = CELL_OUTER_SIZE * (CELL_COLUMNS as f32);
+        let h = CELL_OUTER_SIZE * (CELL_ROWS as f32);
+        let rect = Rect::from_corners(Vec2::new(-w / 2., -h / 2.), Vec2::new(w / 2., h / 2.));
+        if !rect.contains(transform.translation().xy()) {
+            commands.entity(entity).insert((
+                Neutron::Dying,
+                Expiry(Timer::from_seconds(0.5, TimerMode::Once)),
+            ));
         }
     }
 }

@@ -12,6 +12,9 @@ pub fn plugin(app: &mut App) {
     app.configure_sets(
         RunSimulation,
         (
+            PhaseSystems::PowerGeneration
+                .run_if(in_state(Phase::PowerGeneration))
+                .run_if(in_state(Screen::Gameplay)),
             PhaseSystems::WaterFlow
                 .run_if(in_state(Phase::WaterFlow))
                 .run_if(in_state(Screen::Gameplay)),
@@ -43,6 +46,7 @@ pub fn plugin(app: &mut App) {
 #[derive(States, Clone, Copy, Reflect, Default, Debug, Eq, PartialEq, Hash)]
 pub enum Phase {
     #[default]
+    PowerGeneration,
     WaterFlow,
     NeutronRelease,
     SteamVenting,
@@ -51,15 +55,17 @@ pub enum Phase {
 impl Phase {
     fn next(&self) -> Self {
         match *self {
+            Self::PowerGeneration => Self::WaterFlow,
             Self::WaterFlow => Self::NeutronRelease,
             Self::NeutronRelease => Self::SteamVenting,
-            Self::SteamVenting => Self::WaterFlow,
+            Self::SteamVenting => Self::PowerGeneration,
         }
     }
 }
 
 #[derive(SystemSet, Clone, Copy, Reflect, Debug, Hash, PartialEq, Eq)]
 pub enum PhaseSystems {
+    PowerGeneration,
     WaterFlow,
     NeutronRelease,
     SteamVenting,
@@ -102,19 +108,20 @@ fn on_launch_neutron(
     Ok(())
 }
 
-fn launch_neutrons(mut commands: Commands, fuel_rods: Query<(Entity, &FuelRod, &Reactivity)>) {
+fn launch_neutrons(mut commands: Commands, fuel_rods: Query<(Entity, &FuelRod)>) {
     let mut rng = rand::rng();
-    for (entity, &fuel_rod, reactivity) in &fuel_rods {
+    for (entity, &fuel_rod) in &fuel_rods {
         if fuel_rod != FuelRod::Uranium {
             continue;
         }
 
-        // TODO: more than one neutron should be launched
-        if reactivity.0 > rng.random_range(0.0..1.0) {
-            commands.trigger(LaunchNeutron {
-                origin: entity,
-                angle: rng.random_range(0.0..TAU),
-            });
+        for _ in 0..MAX_NEUTRONS_RELEASED_PER_TICK {
+            if rng.random_range(0.0..1.0) < NEUTRON_SPAWN_CHANCE {
+                commands.trigger(LaunchNeutron {
+                    origin: entity,
+                    angle: rng.random_range(0.0..TAU),
+                });
+            }
         }
     }
 }

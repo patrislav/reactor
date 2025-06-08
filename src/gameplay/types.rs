@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use avian2d::prelude::PhysicsLayer;
 use bevy::{platform::collections::HashMap, prelude::*, time::Stopwatch};
 use rand::Rng;
@@ -20,6 +22,7 @@ pub fn plugin(app: &mut App) {
 pub enum Particle {
     Water,
     Steam,
+    Energy,
 }
 
 impl Particle {
@@ -27,11 +30,12 @@ impl Particle {
         match self {
             Particle::Water => Color::from(WATER_COLOR),
             Particle::Steam => Color::from(STEAM_COLOR),
+            Particle::Energy => URANIUM_COLOR,
         }
     }
 }
 
-#[derive(Component, Clone, Reflect, Default)]
+#[derive(Component, Clone, Reflect, Default, Eq, PartialEq)]
 #[reflect(Component)]
 #[require(CurrentAngle, CurrentDistance)]
 pub enum Neutron {
@@ -152,6 +156,27 @@ pub struct CellIndex(pub usize);
 #[derive(Component, Clone, Copy, Reflect, Default)]
 #[reflect(Component)]
 pub struct Reactivity(pub f32);
+
+#[derive(Component, Clone, Copy, Reflect, Default)]
+pub struct PowerDemand(pub usize);
+
+#[derive(Component, Clone, Reflect)]
+pub struct NextPowerDemand {
+    pub demand: usize,
+    pub timer: Timer,
+}
+
+impl Default for NextPowerDemand {
+    fn default() -> Self {
+        Self {
+            demand: 5,
+            timer: Timer::new(
+                Duration::from_secs_f32(INCREASE_POWER_DEMAND_SEC),
+                TimerMode::Repeating,
+            ),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Default, Reflect, Eq, PartialEq, Hash)]
 pub struct Position {

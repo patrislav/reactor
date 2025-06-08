@@ -5,6 +5,7 @@ use bevy::{color::palettes::css::WHITE, prelude::*, sprite::AlphaMode2d};
 use crate::{PausableSystems, asset_tracking::LoadResource, screens::Screen};
 
 pub mod constants;
+pub mod crt;
 pub mod neutrons;
 pub mod particles;
 pub mod schedule;
@@ -12,6 +13,7 @@ pub mod simulation;
 pub mod types;
 
 pub use constants::*;
+pub use crt::*;
 pub use neutrons::*;
 pub use particles::*;
 pub use schedule::*;
@@ -24,6 +26,7 @@ pub fn plugin(app: &mut App) {
     app.add_plugins(particles::plugin);
     app.add_plugins(types::plugin);
     app.add_plugins(neutrons::plugin);
+    app.add_plugins(CrtPlugin);
 
     app.init_resource::<GameplayAssets>();
     app.load_resource::<GameplayAssets>();
@@ -64,9 +67,8 @@ pub fn plugin(app: &mut App) {
 pub struct GameplayAssets {
     particle: Handle<Mesh>,
 
-    #[dependency]
-    music: Handle<AudioSource>,
-
+    //#[dependency]
+    //music: Handle<AudioSource>,
     #[dependency]
     add_water: Handle<Image>,
 }
@@ -77,7 +79,6 @@ impl FromWorld for GameplayAssets {
             let assets = world.resource::<AssetServer>();
             Self {
                 particle: meshes.add(Circle::new(PARTICLE_RADIUS)),
-                music: assets.load("audio/music/Fluffing A Duck.ogg"),
                 add_water: assets.load("images/add-water.png"),
             }
         })
@@ -85,7 +86,12 @@ impl FromWorld for GameplayAssets {
 }
 
 fn spawn_reactor(mut commands: Commands) {
-    commands.spawn((Name::new("Camera"), Camera2d, StateScoped(Screen::Gameplay)));
+    commands.spawn((
+        Name::new("Camera"),
+        Camera2d,
+        StateScoped(Screen::Gameplay),
+        CrtSettings::default(),
+    ));
     commands.spawn((
         Name::new("Reactor Core"),
         ReactorCore::default(),

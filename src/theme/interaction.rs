@@ -10,7 +10,14 @@ pub(super) fn plugin(app: &mut App) {
     app.load_resource::<InteractionAssets>();
     app.add_observer(play_on_hover_sound_effect);
     app.add_observer(play_on_click_sound_effect);
+    app.add_observer(set_font);
 }
+
+#[derive(Component, Copy, Clone, Reflect, Default)]
+pub struct PlaysHoverSound;
+
+#[derive(Component, Copy, Clone, Reflect, Default)]
+pub struct PlaysClickSound;
 
 /// Palette for widget interactions. Add this to an entity that supports
 /// [`Interaction`]s, such as a button, to change its [`BackgroundColor`] based
@@ -46,6 +53,8 @@ struct InteractionAssets {
     hover: Handle<AudioSource>,
     #[dependency]
     click: Handle<AudioSource>,
+    #[dependency]
+    font: Handle<Font>,
 }
 
 impl FromWorld for InteractionAssets {
@@ -54,6 +63,7 @@ impl FromWorld for InteractionAssets {
         Self {
             hover: assets.load("audio/sound_effects/button_hover.ogg"),
             click: assets.load("audio/sound_effects/button_click.ogg"),
+            font: assets.load("fonts/Lato-Light.ttf"),
         }
     }
 }
@@ -62,7 +72,7 @@ fn play_on_hover_sound_effect(
     trigger: Trigger<Pointer<Over>>,
     mut commands: Commands,
     interaction_assets: Option<Res<InteractionAssets>>,
-    interaction_query: Query<(), With<Interaction>>,
+    interaction_query: Query<(), Or<(With<Interaction>, With<PlaysHoverSound>)>>,
 ) {
     let Some(interaction_assets) = interaction_assets else {
         return;
@@ -77,7 +87,7 @@ fn play_on_click_sound_effect(
     trigger: Trigger<Pointer<Click>>,
     mut commands: Commands,
     interaction_assets: Option<Res<InteractionAssets>>,
-    interaction_query: Query<(), With<Interaction>>,
+    interaction_query: Query<(), Or<(With<Interaction>, With<PlaysClickSound>)>>,
 ) {
     let Some(interaction_assets) = interaction_assets else {
         return;
@@ -85,5 +95,15 @@ fn play_on_click_sound_effect(
 
     if interaction_query.contains(trigger.target()) {
         commands.spawn(sound_effect(interaction_assets.click.clone()));
+    }
+}
+
+fn set_font(
+    trigger: Trigger<OnAdd, TextFont>,
+    assets: Res<InteractionAssets>,
+    mut query: Query<&mut TextFont>,
+) {
+    if let Ok(mut text_font) = query.get_mut(trigger.target()) {
+        text_font.font = assets.font.clone();
     }
 }

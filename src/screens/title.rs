@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use crate::{menus::Menu, screens::Screen};
+use crate::{gameplay::CrtSettings, menus::Menu, screens::Screen};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
@@ -13,7 +13,12 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn spawn_main_menu(mut commands: Commands) {
-    commands.spawn((Name::new("Camera"), Camera2d, StateScoped(Screen::Title)));
+    commands.spawn((
+        Name::new("Camera"),
+        Camera2d,
+        StateScoped(Screen::Title),
+        CrtSettings::default(),
+    ));
 }
 
 fn open_main_menu(mut next_menu: ResMut<NextState<Menu>>) {

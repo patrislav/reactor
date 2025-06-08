@@ -19,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
 pub struct Music;
 
 /// A music audio instance.
-pub fn music(handle: Handle<AudioSource>) -> impl Bundle {
+pub fn _music(handle: Handle<AudioSource>) -> impl Bundle {
     (AudioPlayer(handle), PlaybackSettings::LOOP, Music)
 }
 

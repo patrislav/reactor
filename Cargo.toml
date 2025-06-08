@@ -6,7 +6,7 @@ edition = "2024"
 default-run = "reactor"
 
 [dependencies]
-bevy = { version = "0.16", features = ["wayland", "webgpu"] }
+bevy = { version = "0.16", features = ["wayland"] }
 rand = "0.9"
 # Compile low-severity logs out of native builds for performance.
 log = { version = "0.4", features = [

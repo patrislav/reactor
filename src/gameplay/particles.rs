@@ -114,7 +114,7 @@ fn handle_move_particle(
             return Ok(());
         }
     }
-    commands.entity(trigger.target()).insert(EasedMotion {
+    commands.entity(trigger.target()).try_insert(EasedMotion {
         from: *current,
         to: current.with_translation(Vec3::new(dest.x, dest.y, current.translation.z)),
         timer: Timer::from_seconds(1.0, TimerMode::Once),
@@ -177,7 +177,7 @@ fn update_eased_movement(
 
         if motion.timer.just_finished() {
             commands.trigger_targets(FinishedEasedMotion, entity);
-            commands.entity(entity).remove::<EasedMotion>();
+            commands.entity(entity).try_remove::<EasedMotion>();
         }
     }
 }
@@ -200,7 +200,7 @@ fn handle_boil_water_particle(
             .clone_and_spawn_with(|config| {
                 config.deny::<Particle>().deny::<Name>();
             })
-            .insert((
+            .try_insert((
                 Name::new("Steam particle"),
                 Particle::Steam,
                 Lifetime(Stopwatch::new()),
@@ -231,7 +231,7 @@ fn handle_finished_particle_motion(
         if maybe_in_cell.is_none() {
             match particle {
                 Particle::Water(_) => {
-                    commands.entity(trigger.target()).insert(InCell);
+                    commands.entity(trigger.target()).try_insert(InCell);
                 }
                 Particle::Steam => {
                     steam_container.into_inner().count += 1;

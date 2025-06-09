@@ -7,14 +7,18 @@ use bevy::{
 };
 
 use crate::{
-    AppSystems, PausableSystems, asset_tracking::LoadResource, screens::Screen,
-    theme::interaction::UseBoldFont,
+    AppSystems, PausableSystems,
+    asset_tracking::LoadResource,
+    screens::Screen,
+    theme::interaction::{PlaysClickSound, PlaysHoverSound, UseBoldFont},
 };
 
+pub mod audio;
 pub mod constants;
 pub mod control_rods;
 pub mod crt;
 pub mod fuel;
+pub mod legend;
 pub mod neutrons;
 pub mod particles;
 pub mod power;
@@ -26,6 +30,7 @@ pub mod ui;
 pub use constants::*;
 pub use crt::*;
 //pub use fuel::*;
+pub use audio::*;
 pub use neutrons::*;
 pub use particles::*;
 pub use power::*;
@@ -44,6 +49,8 @@ pub fn plugin(app: &mut App) {
     app.add_plugins(fuel::plugin);
     app.add_plugins(CrtPlugin);
     app.add_plugins(power::plugin);
+    app.add_plugins(legend::plugin);
+    app.add_plugins(audio::plugin);
 
     app.init_resource::<GameplayAssets>();
     app.load_resource::<GameplayAssets>();
@@ -185,6 +192,8 @@ fn on_add_reactor_core(
                 Visibility::Inherited,
                 Pickable::default(),
                 CurrentScale::default(),
+                PlaysClickSound,
+                PlaysHoverSound,
             ))
             .observe(on_cell_pointer_over)
             .observe(on_cell_pointer_out)
@@ -207,6 +216,8 @@ fn on_add_reactor_core(
                     8.0,
                 ),
                 Pickable::default(),
+                PlaysHoverSound,
+                PlaysClickSound,
                 RigidBody::Static,
                 Collider::rectangle(CONTROL_ROD_RADIUS * 2., CONTROL_ROD_RADIUS * 2.),
                 CollisionLayers::new(GameLayer::ControlRod, GameLayer::Neutron),
@@ -237,11 +248,15 @@ fn on_add_reactor_core(
 }
 
 fn on_cell_pointer_over(trigger: Trigger<Pointer<Over>>, mut commands: Commands) {
-    commands.entity(trigger.target()).insert(TargetScale(1.25));
+    commands
+        .entity(trigger.target())
+        .try_insert(TargetScale(1.25));
 }
 
 fn on_cell_pointer_out(trigger: Trigger<Pointer<Out>>, mut commands: Commands) {
-    commands.entity(trigger.target()).insert(TargetScale(1.));
+    commands
+        .entity(trigger.target())
+        .try_insert(TargetScale(1.));
 }
 
 fn on_click_add_water(
@@ -316,7 +331,7 @@ fn update_particle_target_angles(
 
         for (i, (entity, _)) in particles.into_iter().enumerate() {
             let angle = i as f32 * (2.0 * PI / total_particles as f32);
-            commands.entity(entity).insert(TargetAngle(angle));
+            commands.entity(entity).try_insert(TargetAngle(angle));
         }
     }
 }
@@ -418,7 +433,7 @@ fn advance_neutron_lifecycle(
                     *neutron = Neutron::Dying;
                     commands
                         .entity(entity)
-                        .insert(Expiry(Timer::from_seconds(0.5, TimerMode::Once)));
+                        .try_insert(Expiry(Timer::from_seconds(0.5, TimerMode::Once)));
                 }
             }
             Neutron::Dying => {

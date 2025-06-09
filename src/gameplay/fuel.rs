@@ -16,6 +16,6 @@ fn update_materials(
             FuelRod::Uranium => URANIUM_COLOR,
             FuelRod::Xenon => XENON_COLOR,
         });
-        commands.entity(entity).insert(MeshMaterial2d(material));
+        commands.entity(entity).try_insert(MeshMaterial2d(material));
     }
 }

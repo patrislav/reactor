@@ -32,11 +32,11 @@ fn on_click(
         } else if insertion.0 > 0.5 {
             commands
                 .entity(trigger.target())
-                .insert(ControlRodMovement::Down);
+                .try_insert(ControlRodMovement::Down);
         } else {
             commands
                 .entity(trigger.target())
-                .insert(ControlRodMovement::Up);
+                .try_insert(ControlRodMovement::Up);
         }
     }
 }
@@ -55,7 +55,7 @@ fn update_insertions(
 
         if insertion.0 >= 1.0 || insertion.0 <= 0.0 {
             insertion.0 = insertion.0.clamp(0.0, 1.0);
-            commands.entity(entity).remove::<ControlRodMovement>();
+            commands.entity(entity).try_remove::<ControlRodMovement>();
         }
     }
 }
@@ -69,10 +69,10 @@ fn update_movement_indicators(
         for &entity in children.into_iter() {
             if indicators.contains(entity) {
                 let angle = match movement {
-                    ControlRodMovement::Up => 0.0,
-                    ControlRodMovement::Down => PI,
+                    ControlRodMovement::Up => PI,
+                    ControlRodMovement::Down => 0.0,
                 };
-                commands.entity(entity).insert((
+                commands.entity(entity).try_insert((
                     Transform::from_rotation(Quat::from_rotation_z(angle)),
                     Visibility::Visible,
                 ));
@@ -90,7 +90,7 @@ fn hide_movement_indicators(
     if let Ok(children) = control_rods.get(trigger.target()) {
         for &entity in children.into_iter() {
             if indicators.contains(entity) {
-                commands.entity(entity).insert(Visibility::Hidden);
+                commands.entity(entity).try_insert(Visibility::Hidden);
             }
         }
     }

@@ -1,6 +1,5 @@
 use bevy::prelude::*;
 use rand::seq::SliceRandom;
-use tracing::Instrument;
 
 use crate::theme::palette::BUTTON_TEXT;
 
@@ -124,6 +123,8 @@ fn spawn_water_container(
             MeshMaterial2d(button_material.clone()),
             Transform::from_xyz(-50., 25., 1.),
             Pickable::default(),
+            PlaysClickSound,
+            PlaysHoverSound,
             children![(
                 Name::new("Minus label"),
                 Text2d::new("<"),
@@ -146,6 +147,8 @@ fn spawn_water_container(
             MeshMaterial2d(button_material.clone()),
             Transform::from_xyz(50., 25., 1.),
             Pickable::default(),
+            PlaysClickSound,
+            PlaysHoverSound,
             children![(
                 Name::new("Plus label"),
                 Text2d::new(">"),
@@ -168,6 +171,8 @@ fn spawn_water_container(
             MeshMaterial2d(button_material.clone()),
             Transform::from_xyz(0., -25., 1.),
             Pickable::default(),
+            PlaysClickSound,
+            PlaysHoverSound,
             children![(
                 Name::new("Distribute label"),
                 Text2d::new("distribute"),

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_inspector_egui::egui::next_tooltip_id;
 
 use crate::screens::game_over::{GameOver, GameOverCause};
 
@@ -18,7 +19,8 @@ pub fn plugin(app: &mut App) {
             handle_lack_of_power_timer,
         )
             .chain()
-            .run_if(in_state(Screen::Gameplay)),
+            .run_if(in_state(Screen::Gameplay))
+            .in_set(PausableSystems),
     );
 }
 
@@ -26,17 +28,15 @@ pub fn plugin(app: &mut App) {
 pub struct TicksWithoutPower(pub usize);
 
 fn tick_timers(time: Res<Time>, mut query: Single<&mut NextPowerDemand>) {
-    query.demand_timer.tick(time.delta());
-    query.demand_rate_timer.tick(time.delta());
     query.tutorial_timer.tick(time.delta());
+    if query.tutorial_timer.finished() {
+        query.demand_timer.tick(time.delta());
+        query.demand_rate_timer.tick(time.delta());
+    }
 }
 
 fn increase_power_demand(query: Single<(&NextPowerDemand, &mut PowerDemand)>) {
     let (next, mut current) = query.into_inner();
-
-    if !next.tutorial_timer.finished() {
-        return;
-    }
 
     if next.demand_timer.just_finished() {
         current.0 += next.delta;
@@ -44,10 +44,6 @@ fn increase_power_demand(query: Single<(&NextPowerDemand, &mut PowerDemand)>) {
 }
 
 fn increase_power_demand_increase_rate(mut next: Single<&mut NextPowerDemand>) {
-    if !next.tutorial_timer.finished() {
-        return;
-    }
-
     if next.demand_rate_timer.just_finished() {
         next.delta += 1;
     }
@@ -81,8 +77,12 @@ fn turn_steam_into_power(
     ) = energy_container.into_inner();
     let (mut steam_container, steam_transform) = steam_container.into_inner();
 
-    let diff = (demand.0 + next_demand.delta) - energy_container.count;
-    let count = steam_container.count.min(diff);
+    let diff = if energy_container.count < demand.0 {
+        demand.0 - energy_container.count
+    } else {
+        0
+    };
+    let count = steam_container.count.min(diff + next_demand.delta);
 
     for _ in 0..count {
         steam_container.count -= 1;
@@ -126,12 +126,12 @@ fn handle_lack_of_power(
     } else if ticks.0 > 5 {
         commands
             .entity(entity)
-            .insert(LackOfPowerTimer(Timer::from_seconds(1.0, TimerMode::Once)));
+            .try_insert(LackOfPowerTimer(Timer::from_seconds(1.0, TimerMode::Once)));
     } else {
         commands
             .entity(entity)
             .remove::<LackOfPowerTimer>()
-            .insert(ParticleContainerColor(URANIUM_COLOR));
+            .try_insert(ParticleContainerColor(URANIUM_COLOR));
     }
 }
 
@@ -153,7 +153,7 @@ fn handle_lack_of_power_timer(
     } else {
         1.0 - ((t - 0.5) / 0.5) // 1.0 -> 0.0
     };
-    commands.entity(entity).insert(ParticleContainerColor(
+    commands.entity(entity).try_insert(ParticleContainerColor(
         Color::from(WARNING_COLOR).mix(&URANIUM_COLOR, blend),
     ));
 }

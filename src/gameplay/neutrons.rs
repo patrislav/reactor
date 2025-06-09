@@ -22,6 +22,9 @@ pub fn plugin(app: &mut App) {
 #[derive(Event, Reflect, Copy, Clone, Debug)]
 pub struct BoilWaterParticle;
 
+#[derive(Event, Reflect, Copy, Clone, Debug)]
+pub struct NeutronCollision;
+
 fn handle_neutron_collisions(
     mut events: EventReader<CollisionStarted>,
     mut commands: Commands,
@@ -50,6 +53,8 @@ fn handle_neutron_collisions(
             if neutron_origin.0 == other_entity {
                 continue;
             }
+
+            commands.trigger_targets(NeutronCollision, neutron_entity);
             match fuel_rod {
                 FuelRod::Uranium => {
                     let angles = [-0.2 * PI, 0.0, 0.2 * PI];
@@ -62,7 +67,7 @@ fn handle_neutron_collisions(
                     cleanup.write(Cleanup(neutron_entity));
                 }
                 FuelRod::Xenon => {
-                    commands.entity(other_entity).insert(FuelRod::Uranium);
+                    commands.entity(other_entity).try_insert(FuelRod::Uranium);
                     cleanup.write(Cleanup(neutron_entity));
                 }
             }
@@ -128,7 +133,7 @@ fn check_neutron_out_of_bounds(
         let h = CELL_OUTER_SIZE * (CELL_ROWS as f32);
         let rect = Rect::from_corners(Vec2::new(-w / 2., -h / 2.), Vec2::new(w / 2., h / 2.));
         if !rect.contains(transform.translation().xy()) {
-            commands.entity(entity).insert((
+            commands.entity(entity).try_insert((
                 Neutron::Dying,
                 Expiry(Timer::from_seconds(0.5, TimerMode::Once)),
             ));

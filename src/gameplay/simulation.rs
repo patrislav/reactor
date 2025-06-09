@@ -143,7 +143,7 @@ fn turn_uranium_into_xenon(mut commands: Commands, fuel_rods: Query<(Entity, &Fu
         }
 
         if rng.random_range(0.0..1.0) < XENON_SPAWN_CHANCE_PER_TICK {
-            commands.entity(entity).insert(FuelRod::Xenon);
+            commands.entity(entity).try_insert(FuelRod::Xenon);
         }
     }
 }
@@ -174,11 +174,11 @@ fn vent_steam(
             let new_transform = particle_transform.reparented_to(container_transform);
             commands
                 .entity(entity)
-                .remove::<Lifetime>()
-                .remove::<TargetAngle>()
-                .remove::<EasedMotion>()
-                .remove::<InCell>()
-                .insert((ChildOf(container_entity), new_transform));
+                .try_remove::<Lifetime>()
+                .try_remove::<TargetAngle>()
+                .try_remove::<EasedMotion>()
+                .try_remove::<InCell>()
+                .try_insert((ChildOf(container_entity), new_transform));
             commands.trigger_targets(
                 MoveParticle {
                     to: Vec2::new(0.0, 0.0),
@@ -207,15 +207,15 @@ fn track_cell_pressure(
         } else if particle_count.get() > PRESSURE_WARN_LEVEL {
             commands
                 .entity(entity)
-                .insert(OverPressureTimer(Timer::from_seconds(
+                .try_insert(OverPressureTimer(Timer::from_seconds(
                     1.0,
                     TimerMode::Repeating,
                 )));
         } else {
             commands
                 .entity(entity)
-                .remove::<OverPressureTimer>()
-                .insert(CellColor(Color::from(CELL_COLOR)));
+                .try_remove::<OverPressureTimer>()
+                .try_insert(CellColor(Color::from(CELL_COLOR)));
         }
     }
 }
@@ -235,7 +235,7 @@ fn handle_overpressure_timer(
     } else {
         1.0 - ((t - 0.5) / 0.5) // 1.0 -> 0.0
     };
-    commands.entity(entity).insert(CellColor(
+    commands.entity(entity).try_insert(CellColor(
         Color::from(WARNING_COLOR).mix(&CELL_COLOR.into(), blend),
     ));
 }

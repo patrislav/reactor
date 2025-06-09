@@ -2,6 +2,7 @@
 
 mod credits;
 mod game_over;
+mod instructions;
 mod main;
 mod pause;
 mod settings;
@@ -17,6 +18,7 @@ pub(super) fn plugin(app: &mut App) {
         settings::plugin,
         pause::plugin,
         game_over::plugin,
+        instructions::plugin,
     ));
 }
 
@@ -30,4 +32,7 @@ pub enum Menu {
     Settings,
     Pause,
     GameOver,
+    HowToPlay,
+    HowToPlay2,
+    HowToPlay3,
 }

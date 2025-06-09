@@ -15,6 +15,7 @@ fn spawn_main_menu(mut commands: Commands) {
         StateScoped(Menu::Main),
         #[cfg(not(target_family = "wasm"))]
         children![
+            widget::title("mini reactor"),
             widget::button("play", enter_loading_or_gameplay_screen),
             widget::button("settings", open_settings_menu),
             widget::button("credits", open_credits_menu),
@@ -22,6 +23,7 @@ fn spawn_main_menu(mut commands: Commands) {
         ],
         #[cfg(target_family = "wasm")]
         children![
+            widget::title("mini reactor"),
             widget::button("play", enter_loading_or_gameplay_screen),
             widget::button("settings", open_settings_menu),
             widget::button("credits", open_credits_menu),

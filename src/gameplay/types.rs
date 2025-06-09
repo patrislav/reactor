@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use avian2d::prelude::PhysicsLayer;
-use bevy::{color::palettes::css, platform::collections::HashMap, prelude::*, time::Stopwatch};
+use bevy::{platform::collections::HashMap, prelude::*, time::Stopwatch};
 use rand::Rng;
 
 use super::*;

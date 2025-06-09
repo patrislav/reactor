@@ -21,11 +21,13 @@ pub(super) fn plugin(app: &mut App) {
             ),
         ),
     );
+    app.add_systems(OnEnter(Screen::Gameplay), show_how_to_play);
     app.add_systems(OnExit(Screen::Gameplay), (close_menu, unpause));
     app.add_systems(
         OnEnter(Menu::None),
         unpause.run_if(in_state(Screen::Gameplay)),
     );
+    app.add_systems(OnEnter(Menu::HowToPlay), (pause, spawn_pause_overlay));
 }
 
 fn unpause(mut next_pause: ResMut<NextState<Pause>>) {
@@ -56,4 +58,8 @@ fn open_pause_menu(mut next_menu: ResMut<NextState<Menu>>) {
 
 fn close_menu(mut next_menu: ResMut<NextState<Menu>>) {
     next_menu.set(Menu::None);
+}
+
+fn show_how_to_play(mut next_menu: ResMut<NextState<Menu>>) {
+    next_menu.set(Menu::HowToPlay);
 }

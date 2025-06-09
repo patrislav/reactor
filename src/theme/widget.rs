@@ -29,6 +29,24 @@ pub fn ui_root(name: impl Into<Cow<'static, str>>) -> impl Bundle {
     )
 }
 
+/// A simple title label. Bigger than [`iwheaderl`].
+pub fn title(text: impl Into<String>) -> impl Bundle {
+    (
+        Node {
+            border: UiRect::bottom(Val::Px(5.)),
+            margin: UiRect::bottom(Val::Px(45.)),
+            ..default()
+        },
+        BorderColor(HEADER_TEXT),
+        children![(
+            Name::new("Title"),
+            Text(text.into()),
+            TextFont::from_font_size(120.0),
+            TextColor(HEADER_TEXT),
+        )],
+    )
+}
+
 /// A simple header label. Bigger than [`label`].
 pub fn header(text: impl Into<String>) -> impl Bundle {
     (
@@ -46,6 +64,21 @@ pub fn label(text: impl Into<String>) -> impl Bundle {
         Text(text.into()),
         TextFont::from_font_size(24.0),
         TextColor(LABEL_TEXT),
+    )
+}
+
+/// A simple text label.
+pub fn text(text: impl Into<String>) -> impl Bundle {
+    (
+        Name::new("Text"),
+        Node {
+            justify_content: JustifyContent::Stretch,
+            width: Val::Percent(100.),
+            ..default()
+        },
+        Text(text.into()),
+        TextFont::from_font_size(22.0),
+        TextColor(HEADER_TEXT),
     )
 }
 

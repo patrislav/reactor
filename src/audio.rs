@@ -20,7 +20,11 @@ pub struct Music;
 
 /// A music audio instance.
 pub fn music(handle: Handle<AudioSource>) -> impl Bundle {
-    (AudioPlayer(handle), PlaybackSettings::LOOP, Music)
+    (
+        AudioPlayer(handle),
+        PlaybackSettings::LOOP.with_volume(Volume::Linear(0.65)),
+        Music,
+    )
 }
 
 /// An organizational marker component that should be added to a spawned [`AudioPlayer`] if it's in the

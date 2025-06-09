@@ -76,11 +76,7 @@ fn turn_steam_into_power(
     ) = energy_container.into_inner();
     let (mut steam_container, steam_transform) = steam_container.into_inner();
 
-    let diff = if energy_container.count < demand.0 {
-        demand.0 - energy_container.count
-    } else {
-        0
-    };
+    let diff = demand.0.saturating_sub(energy_container.count);
     let count = steam_container.count.min(diff + next_demand.delta);
 
     for _ in 0..count {

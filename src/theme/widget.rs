@@ -29,7 +29,7 @@ pub fn ui_root(name: impl Into<Cow<'static, str>>) -> impl Bundle {
     )
 }
 
-/// A simple title label. Bigger than [`iwheaderl`].
+/// A simple title label. Bigger than [`header`].
 pub fn title(text: impl Into<String>) -> impl Bundle {
     (
         Node {

@@ -44,7 +44,7 @@ fn increase_power_demand(query: Single<(&NextPowerDemand, &mut PowerDemand)>) {
 
 fn increase_power_demand_increase_rate(mut next: Single<&mut NextPowerDemand>) {
     if next.demand_rate_timer.just_finished() {
-        next.delta += 1;
+        next.delta = (next.delta as f32 * 1.5) as usize;
     }
 }
 

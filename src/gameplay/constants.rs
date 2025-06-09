@@ -32,8 +32,8 @@ pub const STEAM_GENERATED_PER_WATER: usize = 2;
 pub const STEAM_VENTED_PER_TICK: usize = 3;
 pub const XENON_SPAWN_CHANCE_PER_TICK: f32 = 0.1;
 
-pub const PRESSURE_WARN_LEVEL: usize = 30;
-pub const PRESSURE_EXPLOSION_LEVEL: usize = 50;
+pub const PRESSURE_WARN_LEVEL: usize = 15;
+pub const PRESSURE_EXPLOSION_LEVEL: usize = 30;
 
 pub const CELL_COLOR: Srgba = css::GRAY;
 pub const WATER_COLOR: Srgba = css::LIGHT_SKY_BLUE;

@@ -3,7 +3,7 @@ use rand::seq::IndexedRandom;
 
 use crate::{
     asset_tracking::LoadResource,
-    audio::{music, sound_effect_volume},
+    audio::{Music, music, sound_effect_volume},
     screens::Screen,
 };
 
@@ -71,6 +71,8 @@ fn on_boil_water(_: Trigger<BoilWaterParticle>, mut commands: Commands, assets: 
     commands.spawn(sound_effect_volume(assets.water1.clone(), 0.7));
 }
 
-fn play_music(mut commands: Commands, assets: Res<AudioAssets>) {
-    commands.spawn(music(assets.music.clone()));
+fn play_music(mut commands: Commands, query: Query<(), With<Music>>, assets: Res<AudioAssets>) {
+    if query.is_empty() {
+        commands.spawn(music(assets.music.clone()));
+    }
 }
